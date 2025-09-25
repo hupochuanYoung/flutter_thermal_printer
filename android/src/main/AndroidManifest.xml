@@ -2,4 +2,7 @@
   package="com.example.flutter_thermal_printer">
     <uses-feature android:name="android.hardware.usb.host" android:required="false"/>
     <uses-permission android:name="android.permission.USB_PERMISSION"/> 
+    <!-- Tell Google Play Store that your app uses Classic Bluetooth -->
+    <uses-feature android:name="android.hardware.bluetooth" android:required="false" />
+
 </manifest>
