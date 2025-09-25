@@ -53,4 +53,18 @@ abstract class FlutterThermalPrinterPlatform extends PlatformInterface {
   Future<void> getPrinters() {
     throw UnimplementedError("getPrinters() has not been implemented.");
   }
+
+// 经典蓝牙相关方法
+  Future<List<Map<String, dynamic>>> getBluetoothDevicesList() {
+    throw UnimplementedError(
+        'getBluetoothDevicesList() has not been implemented.');
+  }
+
+  Future<bool> startBluetoothScan() {
+    throw UnimplementedError('startBluetoothScan() has not been implemented.');
+  }
+
+  Future<bool> stopBluetoothScan() {
+    throw UnimplementedError('stopBluetoothScan() has not been implemented.');
+  }
 }

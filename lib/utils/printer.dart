@@ -21,7 +21,9 @@ class Printer {
 
   Printer.fromJson(Map<String, dynamic> json) {
     address = json['address'];
-    name = json['connectionType'] == 'BLE' ? json['platformName'] : json['name'];
+    name = json['connectionType'] == 'BLUETOOTH_CLASSIC'
+        ? json['platformName']
+        : json['name'];
     connectionType = _getConnectionTypeFromString(json['connectionType']);
     isConnected = json['isConnected'];
     vendorId = json['vendorId'];
@@ -31,7 +33,7 @@ class Printer {
   Map<String, dynamic> toJson() {
     final Map<String, dynamic> data = <String, dynamic>{};
     data['address'] = address;
-    if (connectionType == ConnectionType.BLE) {
+    if (connectionType == ConnectionType.BLUETOOTH_CLASSIC) {
       data['platformName'] = name;
     } else {
       data['name'] = name;
@@ -45,8 +47,8 @@ class Printer {
 
   ConnectionType _getConnectionTypeFromString(String? connectionType) {
     switch (connectionType) {
-      case 'BLE':
-        return ConnectionType.BLE;
+      case 'BLUETOOTH_CLASSIC':
+        return ConnectionType.BLUETOOTH_CLASSIC;
       case 'USB':
         return ConnectionType.USB;
       case 'NETWORK':
@@ -58,7 +60,7 @@ class Printer {
 }
 
 enum ConnectionType {
-  BLE,
+  BLUETOOTH_CLASSIC,
   USB,
   NETWORK,
 }
@@ -66,7 +68,7 @@ enum ConnectionType {
 extension PrinterExtension on Printer {
   String get connectionTypeString {
     switch (connectionType) {
-      case ConnectionType.BLE:
+      case ConnectionType.BLUETOOTH_CLASSIC:
         return 'BLE';
       case ConnectionType.USB:
         return 'USB';
@@ -78,11 +80,11 @@ extension PrinterExtension on Printer {
   }
 
   Stream<BluetoothConnectionState> get connectionState {
-    if (connectionType != ConnectionType.BLE) {
+    if (connectionType != ConnectionType.BLUETOOTH_CLASSIC) {
       throw UnsupportedError('Only BLE printers are supported');
     }
     if (address == null) {
-      throw ArgumentError('Address is required for BLE printers');
+      throw ArgumentError('Addre  ss is required for BLE printers');
     }
     return BluetoothDevice.fromId(address!).connectionState;
   }

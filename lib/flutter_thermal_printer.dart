@@ -78,7 +78,7 @@ class FlutterThermalPrinter {
     Duration refreshDuration = const Duration(seconds: 2),
     List<ConnectionType> connectionTypes = const [
       ConnectionType.USB,
-      ConnectionType.BLE
+      ConnectionType.BLUETOOTH_CLASSIC
     ],
     bool androidUsesFineLocation = false,
   }) async {
@@ -217,7 +217,7 @@ class FlutterThermalPrinter {
       pixelRatio: View.of(context).devicePixelRatio,
       delay: delay,
     );
-    if (printer.connectionType == ConnectionType.BLE) {
+    if (printer.connectionType == ConnectionType.BLUETOOTH_CLASSIC) {
       CapabilityProfile profile0 = profile ?? await CapabilityProfile.load();
       final ticket = Generator(paperSize, profile0);
       img.Image? imagebytes = img.decodeImage(image);
@@ -294,7 +294,8 @@ class FlutterThermalPrinter {
     bool printOnBle = false,
     int? customWidth,
   }) async {
-    if (printOnBle == false && printer.connectionType == ConnectionType.BLE) {
+    if (printOnBle == false &&
+        printer.connectionType == ConnectionType.BLUETOOTH_CLASSIC) {
       throw Exception(
         "Image printing on BLE Printer may be slow or fail. Still Need try? set printOnBle to true",
       );

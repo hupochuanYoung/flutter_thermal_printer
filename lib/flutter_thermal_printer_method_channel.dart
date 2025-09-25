@@ -27,6 +27,7 @@ class MethodChannelFlutterThermalPrinter extends FlutterThermalPrinterPlatform {
     return await methodChannel.invokeMethod('connect', {
       "vendorId": device.vendorId.toString(),
       "productId": device.productId.toString(),
+      "address": device.address ?? "",
     });
   }
 
@@ -37,6 +38,7 @@ class MethodChannelFlutterThermalPrinter extends FlutterThermalPrinterPlatform {
       "productId": device.productId.toString(),
       "data": List<int>.from(data),
       "path": path ?? "",
+      "address": device.address ?? "",
     });
   }
 
@@ -45,6 +47,7 @@ class MethodChannelFlutterThermalPrinter extends FlutterThermalPrinterPlatform {
     return await methodChannel.invokeMethod('isConnected', {
       "vendorId": device.vendorId.toString(),
       "productId": device.productId.toString(),
+      "address": device.address ?? "",
     });
   }
 
@@ -60,6 +63,27 @@ class MethodChannelFlutterThermalPrinter extends FlutterThermalPrinterPlatform {
     return await methodChannel.invokeMethod('disconnect', {
       "vendorId": device.vendorId.toString(),
       "productId": device.productId.toString(),
+      "address": device.address ?? "",
     });
+  }
+
+  // 经典蓝牙相关方法实现
+  @override
+  Future<List<Map<String, dynamic>>> getBluetoothDevicesList() async {
+    final List<dynamic> devices =
+        await methodChannel.invokeMethod('getBluetoothDevicesList');
+    return devices.cast<Map<String, dynamic>>();
+  }
+
+  @override
+  Future<bool> startBluetoothScan() async {
+    final result = await methodChannel.invokeMethod('startBluetoothScan');
+    return result as bool;
+  }
+
+  @override
+  Future<bool> stopBluetoothScan() async {
+    final result = await methodChannel.invokeMethod('stopBluetoothScan');
+    return result as bool;
   }
 }
