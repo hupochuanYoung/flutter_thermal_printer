@@ -95,6 +95,15 @@ public class FlutterThermalPrinterPlugin implements FlutterPlugin, MethodCallHan
                 break;
             }
             // 经典蓝牙相关方法
+            case "turnOnBluetooth": {
+                bluetoothPrinter.turnOnBluetooth();
+                result.success(true);
+                break;
+            }
+            case "checkBluetoothPermission": {
+                result.success(bluetoothPrinter.checkBluetoothPermission());
+                break;
+            }
             case "getBluetoothDevicesList":
                 result.success(bluetoothPrinter.getBluetoothDevicesList());
                 break;

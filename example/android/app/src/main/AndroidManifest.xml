@@ -8,9 +8,19 @@
 
     <!-- New Bluetooth permissions in Android 12
     https://developer.android.com/about/versions/12/features/bluetooth-permissions -->
-    <uses-permission android:name="android.permission.BLUETOOTH_SCAN" android:usesPermissionFlags="neverForLocation" />
-    <uses-permission android:name="android.permission.BLUETOOTH_CONNECT" />
+    <!-- Required for Android 12+ -->
+    <uses-permission
+        android:name="android.permission.BLUETOOTH_SCAN"
+        android:usesPermissionFlags="neverForLocation"
+        android:required="false"/>∑
 
+    <uses-permission
+        android:name="android.permission.BLUETOOTH_CONNECT"
+        android:required="false"/>
+
+    <uses-permission
+        android:name="android.permission.BLUETOOTH_ADVERTISE"
+        android:required="false"/>
     <!-- legacy for Android 11 or lower -->
     <uses-permission android:name="android.permission.BLUETOOTH" android:maxSdkVersion="30" />
     <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" android:maxSdkVersion="30" />

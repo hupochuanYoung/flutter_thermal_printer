@@ -34,7 +34,7 @@ class _MyAppState extends State<MyApp> {
     _devicesStreamSubscription?.cancel();
     await _flutterThermalPrinterPlugin.getPrinters(connectionTypes: [
       ConnectionType.USB,
-      ConnectionType.BLE,
+      ConnectionType.BLUETOOTH_CLASSIC,
     ]);
     _devicesStreamSubscription = _flutterThermalPrinterPlugin.devicesStream.listen((List<Printer> event) {
       log(event.map((e) => e.name).toList().toString());

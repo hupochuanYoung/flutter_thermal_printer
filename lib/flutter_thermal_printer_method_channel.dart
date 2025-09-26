@@ -69,10 +69,9 @@ class MethodChannelFlutterThermalPrinter extends FlutterThermalPrinterPlatform {
 
   // 经典蓝牙相关方法实现
   @override
-  Future<List<Map<String, dynamic>>> getBluetoothDevicesList() async {
-    final List<dynamic> devices =
+  Future<List<dynamic>> getBluetoothDevicesList() async {
+    return
         await methodChannel.invokeMethod('getBluetoothDevicesList');
-    return devices.cast<Map<String, dynamic>>();
   }
 
   @override
@@ -85,5 +84,15 @@ class MethodChannelFlutterThermalPrinter extends FlutterThermalPrinterPlatform {
   Future<bool> stopBluetoothScan() async {
     final result = await methodChannel.invokeMethod('stopBluetoothScan');
     return result as bool;
+  }
+
+  @override
+  Future<void> turnOnBluetooth() async {
+    await methodChannel.invokeMethod('turnOnBluetooth');
+  }
+
+  @override
+  Future<bool> checkBluetoothPermission() async {
+    return await methodChannel.invokeMethod('checkBluetoothPermission');
   }
 }

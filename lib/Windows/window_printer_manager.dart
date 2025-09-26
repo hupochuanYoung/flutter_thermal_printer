@@ -119,12 +119,12 @@ class WindowPrinterManager {
   void getPrinters({
     Duration refreshDuration = const Duration(seconds: 5),
     List<ConnectionType> connectionTypes = const [
-      ConnectionType.BLE,
+      ConnectionType.BLUETOOTH_CLASSIC,
       ConnectionType.USB,
     ],
   }) async {
     List<Printer> btlist = [];
-    if (connectionTypes.contains(ConnectionType.BLE)) {
+    if (connectionTypes.contains(ConnectionType.BLUETOOTH_CLASSIC)) {
       await init();
       if (!isInitialized) {
         await init();
@@ -141,7 +141,7 @@ class WindowPrinterManager {
         btlist.add(Printer(
           address: device.address,
           name: device.name,
-          connectionType: ConnectionType.BLE,
+          connectionType: ConnectionType.BLUETOOTH_CLASSIC,
           isConnected: await WinBle.isPaired(device.address),
         ));
       });

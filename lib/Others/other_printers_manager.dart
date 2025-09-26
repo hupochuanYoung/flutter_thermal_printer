@@ -7,6 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:flutter_thermal_printer/flutter_thermal_printer_platform_interface.dart';
 import 'package:flutter_thermal_printer/utils/printer.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 class OtherPrinterManager {
   OtherPrinterManager._privateConstructor();
@@ -30,6 +31,7 @@ class OtherPrinterManager {
   EventChannel eventChannel = EventChannel(channelName);
   EventChannel bluetoothClassicEventChannel =
       EventChannel(bluetoothClassicChannelName);
+
   bool get isIos => !kIsWeb && (Platform.isIOS || Platform.isMacOS);
 
   // Stop scanning for BLE devices
@@ -207,12 +209,16 @@ class OtherPrinterManager {
 
   Future<void> _getBluetoothClassicPrinters() async {
     try {
+      if (!await _requestBluetoothPermissions()) {
+        return;
+      }
       // 获取已配对的经典蓝牙设备
       final devices = await FlutterThermalPrinterPlatform.instance
           .getBluetoothDevicesList();
 
       List<Printer> bluetoothClassicPrinters = [];
-      for (var map in devices) {
+      for (var deviceMap in devices) {
+        final map = Map<String, dynamic>.from(deviceMap);
         final printer = Printer(
           address: map['address'],
           name: map['name'],
@@ -224,13 +230,11 @@ class OtherPrinterManager {
 
       _devices.addAll(bluetoothClassicPrinters);
 
-      // 开始扫描新的经典蓝牙设备
-      await FlutterThermalPrinterPlatform.instance.startBluetoothScan();
-
       // 监听扫描结果
       _bluetoothClassicSubscription?.cancel();
       _bluetoothClassicSubscription =
           bluetoothClassicEventChannel.receiveBroadcastStream().listen((event) {
+        debugPrint('receiveBroadcastStream: $event');
         final map = Map<String, dynamic>.from(event);
         _updateOrAddPrinter(Printer(
           address: map['address'],
@@ -239,11 +243,41 @@ class OtherPrinterManager {
           isConnected: map['isConnected'] ?? false,
         ));
       });
+      // 开始扫描新的经典蓝牙设备
+      await FlutterThermalPrinterPlatform.instance.startBluetoothScan();
 
       sortDevices();
     } catch (e) {
       log("$e [Bluetooth Classic Connection]");
     }
+  }
+
+  Future<bool> _requestBluetoothPermissions() async {
+    if (Platform.isAndroid) {
+      await FlutterThermalPrinterPlatform.instance.turnOnBluetooth();
+
+      bool bluetoothPermission = await FlutterThermalPrinterPlatform.instance
+          .checkBluetoothPermission();
+      if (bluetoothPermission) {
+        log('Bluetooth permissions granted');
+        return true;
+      } else {
+        log('Bluetooth permissions not granted');
+
+        // Only request Bluetooth permissions, not location
+        final scan = await Permission.bluetoothScan.request();
+        final connect = await Permission.bluetoothConnect.request();
+
+        if (scan.isGranted && connect.isGranted) {
+          log("Bluetooth permissions granted after request");
+          return true;
+        } else {
+          log("Bluetooth permissions not granted after request");
+          return false;
+        }
+      }
+    }
+    return false;
   }
 
   void _updateOrAddPrinter(Printer printer) {
@@ -275,14 +309,16 @@ class OtherPrinterManager {
   }
 
   Future<void> turnOnBluetooth() async {
-    await FlutterBluePlus.turnOn();
+    await FlutterThermalPrinterPlatform.instance.turnOnBluetooth();
+  }
+
+  Future<bool> checkBluetoothPermission() async {
+    return await FlutterThermalPrinterPlatform.instance
+        .checkBluetoothPermission();
   }
 
   Stream<bool> get isBleTurnedOnStream {
-    return FlutterBluePlus.adapterState.map(
-      (event) {
-        return event == BluetoothAdapterState.on;
-      },
-    );
+    return FlutterBluePlus.adapterState
+        .map((event) => event == BluetoothAdapterState.on);
   }
 }
