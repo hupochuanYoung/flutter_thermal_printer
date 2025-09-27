@@ -134,6 +134,14 @@ packages:
     description: flutter
     source: sdk
     version: "0.0.0"
+  flutter_blue_classic:
+    dependency: transitive
+    description:
+      name: flutter_blue_classic
+      sha256: "580fac5fa652d8bc45d6f1624d67e0d6b05b7bac721d95b8227ce3dc7d06f021"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.0.6"
   flutter_blue_plus:
     dependency: transitive
     description:

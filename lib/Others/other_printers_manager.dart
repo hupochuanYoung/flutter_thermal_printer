@@ -4,6 +4,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
+// import 'package:flutter_blue_classic/flutter_blue_classic.dart';
 import 'package:flutter_blue_plus/flutter_blue_plus.dart';
 import 'package:flutter_thermal_printer/flutter_thermal_printer_platform_interface.dart';
 import 'package:flutter_thermal_printer/utils/printer.dart';
@@ -31,6 +32,7 @@ class OtherPrinterManager {
   EventChannel eventChannel = EventChannel(channelName);
   EventChannel bluetoothClassicEventChannel =
       EventChannel(bluetoothClassicChannelName);
+  // final _flutterBlueClassicPlugin = FlutterBlueClassic();
 
   bool get isIos => !kIsWeb && (Platform.isIOS || Platform.isMacOS);
 
@@ -42,7 +44,7 @@ class OtherPrinterManager {
     try {
       if (stopBle) {
         await _bluetoothClassicSubscription?.cancel();
-        await FlutterThermalPrinterPlatform.instance.stopScan();
+        await FlutterThermalPrinterPlatform.instance.stopBluetoothScan();
       }
 
       if (stopUsb) {

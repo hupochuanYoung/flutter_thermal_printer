@@ -3,6 +3,7 @@ package com.example.flutter_thermal_printer;
 import android.content.Context;
 
 import androidx.annotation.NonNull;
+import android.util.Log;
 
 import java.util.List;
 

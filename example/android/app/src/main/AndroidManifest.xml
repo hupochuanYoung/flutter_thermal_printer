@@ -12,7 +12,7 @@
     <uses-permission
         android:name="android.permission.BLUETOOTH_SCAN"
         android:usesPermissionFlags="neverForLocation"
-        android:required="false"/>∑
+        android:required="false"/>
 
     <uses-permission
         android:name="android.permission.BLUETOOTH_CONNECT"

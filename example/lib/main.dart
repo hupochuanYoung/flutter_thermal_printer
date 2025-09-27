@@ -48,9 +48,9 @@ class _MyAppState extends State<MyApp> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((timeStamp) {
-      startScan();
-    });
+    // WidgetsBinding.instance.addPostFrameCallback((timeStamp) {
+    //   startScan();
+    // });
   }
 
   stopScan() {
