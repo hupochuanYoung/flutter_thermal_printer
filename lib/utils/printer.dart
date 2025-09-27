@@ -9,6 +9,7 @@ class Printer {
   bool? isConnected;
   String? vendorId;
   String? productId;
+   int? rssi;
 
   Printer({
     this.address,
@@ -17,6 +18,7 @@ class Printer {
     this.isConnected,
     this.vendorId,
     this.productId,
+    this.rssi,
   });
 
   Printer.fromJson(Map<String, dynamic> json) {
@@ -26,6 +28,7 @@ class Printer {
     isConnected = json['isConnected'];
     vendorId = json['vendorId'];
     productId = json['productId'];
+    rssi = json['rssi'];
   }
 
   Map<String, dynamic> toJson() {
@@ -39,6 +42,7 @@ class Printer {
     data['connectionType'] = connectionTypeString;
     data['isConnected'] = isConnected;
     data['vendorId'] = vendorId;
+    data['rssi'] = rssi;
     data['productId'] = productId;
     return data;
   }
