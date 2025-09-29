@@ -207,6 +207,7 @@ class OtherPrinterManager {
   }
 
   // Print data to BLE device
+  // Print data to BLE device
   Future<void> printData(
     DeviceModel device,
     List<int> bytes, {
@@ -237,11 +238,37 @@ class OtherPrinterManager {
             return;
           }
         }
-        bt.output.add(Uint8List.fromList(bytes));
-        await bt.output.allSent;
+
+        // 对于蓝牙设备，如果数据较长或明确标记为长数据，进行分片发送
+        if (longData || bytes.length > 1024) {
+          await _sendDataInChunks(bt, bytes);
+        } else {
+          bt.output.add(Uint8List.fromList(bytes));
+          await bt.output.allSent;
+        }
         return;
       } catch (e) {
         log('Failed to print data to device $e');
+      }
+    }
+  }
+
+  // 分片发送数据到蓝牙设备
+  Future<void> _sendDataInChunks(
+      BluetoothConnection bt, List<int> bytes) async {
+    const int chunkSize = 512; // 每片512字节，适合大多数蓝牙设备
+    const int delayMs = 50; // 每片之间的延迟，给设备处理时间
+
+    for (int i = 0; i < bytes.length; i += chunkSize) {
+      int end = (i + chunkSize < bytes.length) ? i + chunkSize : bytes.length;
+      List<int> chunk = bytes.sublist(i, end);
+
+      bt.output.add(Uint8List.fromList(chunk));
+      await bt.output.allSent;
+
+      // 在分片之间添加延迟，避免设备缓冲区溢出
+      if (end < bytes.length) {
+        await Future.delayed(const Duration(milliseconds: delayMs));
       }
     }
   }
@@ -356,7 +383,7 @@ class OtherPrinterManager {
           address: bluetoothDevice.address,
           name: bluetoothDevice.name,
           connectionType: ConnectionType.BLE,
-            rssi:bluetoothDevice.rssi,
+          rssi: bluetoothDevice.rssi,
           isConnected:
               _activeBluetoothConnections.containsKey(bluetoothDevice.address),
         );

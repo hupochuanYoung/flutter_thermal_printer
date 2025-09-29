@@ -262,46 +262,39 @@ class FlutterThermalPrinter {
       }
       return;
     }
-    if (Platform.isWindows) {
-      await printData(
+
+    CapabilityProfile profile0 = profile ?? await CapabilityProfile.load();
+    final ticket = Generator(paperSize, profile0);
+    img.Image? imagebytes = img.decodeImage(image);
+    imagebytes = _buildImageRasterAvaliable(imagebytes!);
+    final totalheight = imagebytes.height;
+    final totalwidth = imagebytes.width;
+    final timestoCut = totalheight ~/ 30;
+
+    for (var i = 0; i < timestoCut; i++) {
+      final croppedImage = img.copyCrop(
+        imagebytes,
+        x: 0,
+        y: i * 30,
+        width: totalwidth,
+        height: 30,
+      );
+      final raster = ticket.imageRaster(
+        croppedImage,
+        imageFn: PosImageFn.bitImageRaster,
+      );
+      await FlutterThermalPrinter.instance.printData(
         printer,
-        image.toList(),
+        raster,
         longData: true,
       );
-    } else {
-      CapabilityProfile profile0 = profile ?? await CapabilityProfile.load();
-      final ticket = Generator(paperSize, profile0);
-      img.Image? imagebytes = img.decodeImage(image);
-      imagebytes = _buildImageRasterAvaliable(imagebytes!);
-      final totalheight = imagebytes.height;
-      final totalwidth = imagebytes.width;
-      final timestoCut = totalheight ~/ 30;
-
-      for (var i = 0; i < timestoCut; i++) {
-        final croppedImage = img.copyCrop(
-          imagebytes,
-          x: 0,
-          y: i * 30,
-          width: totalwidth,
-          height: 30,
-        );
-        final raster = ticket.imageRaster(
-          croppedImage,
-          imageFn: PosImageFn.bitImageRaster,
-        );
-        await FlutterThermalPrinter.instance.printData(
-          printer,
-          raster,
-          longData: true,
-        );
-      }
-      if (cutAfterPrinted) {
-        await FlutterThermalPrinter.instance.printData(
-          printer,
-          ticket.cut(),
-          longData: true,
-        );
-      }
+    }
+    if (cutAfterPrinted) {
+      await FlutterThermalPrinter.instance.printData(
+        printer,
+        ticket.cut(),
+        longData: true,
+      );
     }
   }
 
@@ -321,42 +314,34 @@ class FlutterThermalPrinter {
       );
     }
 
-    if (Platform.isWindows) {
-      await printData(
+    CapabilityProfile profile0 = profile ?? await CapabilityProfile.load();
+    final ticket = generator ?? Generator(paperSize, profile0);
+    img.Image? imagebytes = img.decodeImage(imageBytes);
+    if (customWidth != null) {
+      final width = _makeDivisibleBy8(customWidth);
+      imagebytes = img.copyResize(imagebytes!, width: width);
+    }
+    imagebytes = _buildImageRasterAvaliable(imagebytes!);
+    final totalheight = imagebytes.height;
+    final totalwidth = imagebytes.width;
+    final timestoCut = totalheight ~/ 30;
+    for (var i = 0; i < timestoCut; i++) {
+      final croppedImage = img.copyCrop(
+        imagebytes,
+        x: 0,
+        y: i * 30,
+        width: totalwidth,
+        height: 30,
+      );
+      final raster = ticket.imageRaster(
+        croppedImage,
+        imageFn: PosImageFn.bitImageRaster,
+      );
+      await FlutterThermalPrinter.instance.printData(
         printer,
-        imageBytes.toList(),
+        raster,
         longData: true,
       );
-    } else {
-      CapabilityProfile profile0 = profile ?? await CapabilityProfile.load();
-      final ticket = generator ?? Generator(paperSize, profile0);
-      img.Image? imagebytes = img.decodeImage(imageBytes);
-      if (customWidth != null) {
-        final width = _makeDivisibleBy8(customWidth);
-        imagebytes = img.copyResize(imagebytes!, width: width);
-      }
-      imagebytes = _buildImageRasterAvaliable(imagebytes!);
-      final totalheight = imagebytes.height;
-      final totalwidth = imagebytes.width;
-      final timestoCut = totalheight ~/ 30;
-      for (var i = 0; i < timestoCut; i++) {
-        final croppedImage = img.copyCrop(
-          imagebytes,
-          x: 0,
-          y: i * 30,
-          width: totalwidth,
-          height: 30,
-        );
-        final raster = ticket.imageRaster(
-          croppedImage,
-          imageFn: PosImageFn.bitImageRaster,
-        );
-        await FlutterThermalPrinter.instance.printData(
-          printer,
-          raster,
-          longData: true,
-        );
-      }
     }
   }
 }
