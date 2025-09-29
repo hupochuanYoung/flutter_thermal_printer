@@ -356,6 +356,7 @@ class OtherPrinterManager {
           address: bluetoothDevice.address,
           name: bluetoothDevice.name,
           connectionType: ConnectionType.BLE,
+            rssi:bluetoothDevice.rssi,
           isConnected:
               _activeBluetoothConnections.containsKey(bluetoothDevice.address),
         );
