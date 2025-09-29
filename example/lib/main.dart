@@ -25,9 +25,9 @@ class _MyAppState extends State<MyApp> {
   String _ip = '192.168.0.100';
   String _port = '9100';
 
-  List<Printer> printers = [];
+  List<DeviceModel> printers = [];
 
-  StreamSubscription<List<Printer>>? _devicesStreamSubscription;
+  StreamSubscription<List<DeviceModel>>? _devicesStreamSubscription;
 
   // Get Printer List
   void startScan() async {
@@ -37,7 +37,7 @@ class _MyAppState extends State<MyApp> {
       ConnectionType.BLE,
     ]);
     _devicesStreamSubscription = _flutterThermalPrinterPlugin.devicesStream
-        .listen((List<Printer> event) {
+        .listen((List<DeviceModel> event) {
       log(event.map((e) => e.name).toList().toString());
       setState(() {
         printers = event;

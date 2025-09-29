@@ -23,7 +23,7 @@ class MethodChannelFlutterThermalPrinter extends FlutterThermalPrinterPlatform {
   }
 
   @override
-  Future<bool> connect(Printer device) async {
+  Future<bool> connect(DeviceModel device) async {
     return await methodChannel.invokeMethod('connect', {
       "vendorId": device.vendorId.toString(),
       "productId": device.productId.toString(),
@@ -31,7 +31,8 @@ class MethodChannelFlutterThermalPrinter extends FlutterThermalPrinterPlatform {
   }
 
   @override
-  Future<bool> printText(Printer device, Uint8List data, {String? path}) async {
+  Future<bool> printText(DeviceModel device, Uint8List data,
+      {String? path}) async {
     return await methodChannel.invokeMethod('printText', {
       "vendorId": device.vendorId.toString(),
       "productId": device.productId.toString(),
@@ -41,7 +42,7 @@ class MethodChannelFlutterThermalPrinter extends FlutterThermalPrinterPlatform {
   }
 
   @override
-  Future<bool> isConnected(Printer device) async {
+  Future<bool> isConnected(DeviceModel device) async {
     return await methodChannel.invokeMethod('isConnected', {
       "vendorId": device.vendorId.toString(),
       "productId": device.productId.toString(),
@@ -56,10 +57,23 @@ class MethodChannelFlutterThermalPrinter extends FlutterThermalPrinterPlatform {
   }
 
   @override
-  Future<bool> disconnect(Printer device) async {
+  Future<bool> disconnect(DeviceModel device) async {
     return await methodChannel.invokeMethod('disconnect', {
       "vendorId": device.vendorId.toString(),
       "productId": device.productId.toString(),
     });
+  }
+
+  @override
+  Future<bool> startListening(String vid, String pid) async {
+    return await methodChannel.invokeMethod('startListening', {
+      "vendorId": vid,
+      "productId": pid,
+    });
+  }
+
+  @override
+  Future<bool> stopListening() async {
+    return await methodChannel.invokeMethod('stopListening');
   }
 }

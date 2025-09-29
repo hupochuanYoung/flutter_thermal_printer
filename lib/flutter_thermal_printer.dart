@@ -1,11 +1,8 @@
 import 'dart:async';
 import 'dart:io';
 import 'dart:typed_data';
-
 import 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_blue_plus/flutter_blue_plus.dart';
-import 'package:flutter_thermal_printer/Windows/window_printer_manager.dart';
 import 'package:flutter_thermal_printer/utils/printer.dart';
 import 'package:image/image.dart' as img;
 import 'package:screenshot/screenshot.dart';
@@ -13,8 +10,6 @@ import 'package:screenshot/screenshot.dart';
 import 'Others/other_printers_manager.dart';
 
 export 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
-export 'package:flutter_blue_plus/flutter_blue_plus.dart'
-    show BluetoothDevice, BluetoothConnectionState;
 export 'package:flutter_thermal_printer/network/network_printer.dart';
 
 class FlutterThermalPrinter {
@@ -23,47 +18,41 @@ class FlutterThermalPrinter {
   static FlutterThermalPrinter? _instance;
 
   static FlutterThermalPrinter get instance {
-    if (!Platform.isWindows) FlutterBluePlus.setLogLevel(LogLevel.debug);
     _instance ??= FlutterThermalPrinter._();
     return _instance!;
   }
 
-  Stream<List<Printer>> get devicesStream {
+  Stream<List<DeviceModel>> get devicesStream {
     if (Platform.isWindows) {
-      return WindowPrinterManager.instance.devicesStream;
+      return Stream.value([]);
     } else {
       return OtherPrinterManager.instance.devicesStream;
     }
   }
 
-  Future<bool> connect(Printer device) async {
+  Future<bool> connect(DeviceModel device) async {
     if (Platform.isWindows) {
-      return await WindowPrinterManager.instance.connect(device);
+      return false;
     } else {
       return await OtherPrinterManager.instance.connect(device);
     }
   }
 
-  Future<void> disconnect(Printer device) async {
+  Future<void> disconnect(DeviceModel device) async {
     if (Platform.isWindows) {
-      // await WindowBleManager.instance.disc(device);
     } else {
       await OtherPrinterManager.instance.disconnect(device);
     }
   }
 
   Future<void> printData(
-    Printer device,
+    DeviceModel device,
     List<int> bytes, {
     bool longData = false,
     bool withoutResponse = false,
   }) async {
     if (Platform.isWindows) {
-      return await WindowPrinterManager.instance.printData(
-        device,
-        bytes,
-        longData: longData,
-      );
+      return;
     } else {
       return await OtherPrinterManager.instance.printData(
         device,
@@ -83,12 +72,8 @@ class FlutterThermalPrinter {
     bool androidUsesFineLocation = false,
   }) async {
     if (Platform.isWindows) {
-      WindowPrinterManager.instance.getPrinters(
-        refreshDuration: refreshDuration,
-        connectionTypes: connectionTypes,
-      );
     } else {
-      OtherPrinterManager.instance.getPrinters(
+      OtherPrinterManager.instance.getDevices(
         connectionTypes: connectionTypes,
         androidUsesFineLocation: androidUsesFineLocation,
       );
@@ -97,7 +82,6 @@ class FlutterThermalPrinter {
 
   Future<void> stopScan() async {
     if (Platform.isWindows) {
-      WindowPrinterManager.instance.stopscan();
     } else {
       OtherPrinterManager.instance.stopScan();
     }
@@ -106,7 +90,6 @@ class FlutterThermalPrinter {
   // Turn On Bluetooth
   Future<void> turnOnBluetooth() async {
     if (Platform.isWindows) {
-      await WindowPrinterManager.instance.turnOnBluetooth();
     } else {
       await OtherPrinterManager.instance.turnOnBluetooth();
     }
@@ -114,18 +97,9 @@ class FlutterThermalPrinter {
 
   Stream<bool> get isBleTurnedOnStream {
     if (Platform.isWindows) {
-      return WindowPrinterManager.instance.isBleTurnedOnStream;
+      return Stream.value(false);
     } else {
       return OtherPrinterManager.instance.isBleTurnedOnStream;
-    }
-  }
-
-  // Get BleState
-  Future<bool> isBleTurnedOn() async {
-    if (Platform.isWindows) {
-      return await WindowPrinterManager.instance.isBleTurnedOn();
-    } else {
-      return FlutterBluePlus.adapterStateNow == BluetoothAdapterState.on;
     }
   }
 
@@ -197,7 +171,7 @@ class FlutterThermalPrinter {
 
   Future<void> printWidget(
     BuildContext context, {
-    required Printer printer,
+    required DeviceModel printer,
     required Widget widget,
     Duration delay = const Duration(milliseconds: 100),
     PaperSize paperSize = PaperSize.mm80,
@@ -286,7 +260,7 @@ class FlutterThermalPrinter {
 
   Future<void> printImageBytes({
     required Uint8List imageBytes,
-    required Printer printer,
+    required DeviceModel printer,
     Duration delay = const Duration(milliseconds: 100),
     PaperSize paperSize = PaperSize.mm80,
     CapabilityProfile? profile,

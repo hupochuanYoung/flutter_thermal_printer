@@ -5,8 +5,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_blue_classic/flutter_blue_classic.dart';
-
-// import 'package:flutter_blue_plus/flutter_blue_plus.dart';
+import 'package:network_info_plus/network_info_plus.dart';
 import 'package:flutter_thermal_printer/flutter_thermal_printer_platform_interface.dart';
 import 'package:flutter_thermal_printer/utils/printer.dart';
 
@@ -20,37 +19,102 @@ class OtherPrinterManager {
     return _instance!;
   }
 
-  final StreamController<List<Printer>> _devicesstream =
-      StreamController<List<Printer>>.broadcast();
+  final StreamController<List<DeviceModel>> _devicesstream =
+      StreamController<List<DeviceModel>>.broadcast();
+  final StreamController<Map<String, dynamic>> _callerIdStream =
+      StreamController<Map<String, dynamic>>.broadcast();
+  final StreamController<ScanningEvent> _scanningStream =
+      StreamController<ScanningEvent>.broadcast();
 
-  Stream<List<Printer>> get devicesStream => _devicesstream.stream;
-  StreamSubscription? subscription;
+  Stream<List<DeviceModel>> get devicesStream => _devicesstream.stream;
+
+  Stream<Map<String, dynamic>> get callerIdStream => _callerIdStream.stream;
+
+  Stream<ScanningEvent> get scanningStream => _scanningStream.stream;
+
+  final List<DeviceModel> _devices = [];
+  final Set<String> _sentDeviceKeys = {};
+
+  StreamSubscription? _usbSubscription;
+  StreamSubscription? _bleSubscription;
+  StreamSubscription? _callerIdSubscription;
   final blueClassic = FlutterBlueClassic(usesFineLocation: true);
 
   // Track active connections
   final Map<String, BluetoothConnection> _activeBluetoothConnections = {};
+  final int _port = 9100;
 
-  static String channelName = 'flutter_thermal_printer/events';
-  EventChannel eventChannel = EventChannel(channelName);
+  static const String _deviceChannelName =
+      'flutter_thermal_printer/device_events';
+  static const String _callerIdChannelName =
+      'flutter_thermal_printer/callerid_events';
+
+  final EventChannel _deviceEventChannel = EventChannel(_deviceChannelName);
+  final EventChannel _callerIdEventChannel = EventChannel(_callerIdChannelName);
 
   bool get isIos => !kIsWeb && (Platform.isIOS || Platform.isMacOS);
 
+  // Convenience getters for current state
+  bool get isBleScanning => _scanningState[ConnectionType.BLE] ?? false;
+
+  bool get isNetworkScanning => _scanningState[ConnectionType.NETWORK] ?? false;
+
+  bool get isUsbScanning => _scanningState[ConnectionType.USB] ?? false;
+
+  bool get isAnyScanning => _scanningState.values.any((scanning) => scanning);
+  // Current scanning state
+  final Map<ConnectionType, bool> _scanningState = {
+    ConnectionType.BLE: false,
+    ConnectionType.NETWORK: false,
+    ConnectionType.USB: false,
+  };
+  Future<bool> startListening(DeviceModel device) async {
+    _callerIdSubscription?.cancel();
+    _callerIdSubscription =
+        _callerIdEventChannel.receiveBroadcastStream().listen((event) {
+      final map = Map<String, dynamic>.from(event);
+      log("Received Caller ID: ${map['caller']} at ${map['datetime']}");
+      _callerIdStream.add(map);
+    });
+
+    return FlutterThermalPrinterPlatform.instance.startListening(
+      device.vendorId!,
+      device.productId!,
+    );
+  }
+
+  Future<bool> stopListening() async {
+    await _callerIdSubscription?.cancel();
+    _callerIdSubscription = null;
+    return FlutterThermalPrinterPlatform.instance.stopListening();
+  }
+
   // Stop scanning for BLE devices
-  Future<void> stopScan({bool stopBle = true, bool stopUsb = true}) async {
+  Future<void> stopScan({
+    bool stopBle = true,
+    bool stopUsb = true,
+    bool stopNetwork = true,
+  }) async {
     try {
       if (stopBle) {
-        await subscription?.cancel();
+        await _bleSubscription?.cancel();
+        _bleSubscription = null;
         blueClassic.stopScan();
+        _updateScanningState(ConnectionType.BLE, false);
       }
       if (stopUsb) {
         await _usbSubscription?.cancel();
+        _updateScanningState(ConnectionType.USB, false);
+      }
+      if (stopNetwork) {
+        _updateScanningState(ConnectionType.NETWORK, false);
       }
     } catch (e) {
       log('Failed to stop scanning for devices $e');
     }
   }
 
-  Future<bool> connect(Printer device) async {
+  Future<bool> connect(DeviceModel device) async {
     if (device.connectionType == ConnectionType.USB) {
       return await FlutterThermalPrinterPlatform.instance.connect(device);
     } else {
@@ -114,7 +178,7 @@ class OtherPrinterManager {
     }
   }
 
-  Future<bool> isConnected(Printer device) async {
+  Future<bool> isConnected(DeviceModel device) async {
     if (device.connectionType == ConnectionType.USB) {
       return await FlutterThermalPrinterPlatform.instance.isConnected(device);
     } else {
@@ -129,7 +193,7 @@ class OtherPrinterManager {
     }
   }
 
-  Future<void> disconnect(Printer device) async {
+  Future<void> disconnect(DeviceModel device) async {
     if (device.connectionType == ConnectionType.BLE) {
       try {
         final bt = _activeBluetoothConnections[device.address!];
@@ -144,38 +208,37 @@ class OtherPrinterManager {
 
   // Print data to BLE device
   Future<void> printData(
-    Printer printer,
+    DeviceModel device,
     List<int> bytes, {
     bool longData = false,
     bool withoutResponse = false,
   }) async {
-    if (printer.connectionType == ConnectionType.USB) {
+    if (device.connectionType == ConnectionType.USB) {
       try {
         await FlutterThermalPrinterPlatform.instance.printText(
-          printer,
+          device,
           Uint8List.fromList(bytes),
-          path: printer.address,
+          path: device.address,
         );
       } catch (e) {
         log("FlutterThermalPrinter: Unable to Print Data $e");
       }
     } else {
       try {
-        BluetoothConnection? device =
-            _activeBluetoothConnections[printer.address!];
-        if (device == null) {
+        BluetoothConnection? bt = _activeBluetoothConnections[device.address!];
+        if (bt == null) {
           log('Device is not connected');
           return;
         }
-        if (!device.isConnected) {
-          bool isConnected = await bluetoothConnect(device.address);
+        if (!bt.isConnected) {
+          bool isConnected = await bluetoothConnect(device.address!);
           if (!isConnected) {
             log('isConnected fail');
             return;
           }
         }
-        device.output.add(Uint8List.fromList(bytes));
-        await device.output.allSent;
+        bt.output.add(Uint8List.fromList(bytes));
+        await bt.output.allSent;
         return;
       } catch (e) {
         log('Failed to print data to device $e');
@@ -183,40 +246,49 @@ class OtherPrinterManager {
     }
   }
 
-  StreamSubscription? refresher;
-
-  final List<Printer> _devices = [];
-  StreamSubscription? _usbSubscription;
-
-  // Get Printers from BT and USB
-  Future<void> getPrinters({
-    List<ConnectionType> connectionTypes = const [
-      ConnectionType.BLE,
-      ConnectionType.USB,
-    ],
+// Get Devices from BT and USB
+  Future<void> getDevices({
+    List<ConnectionType> connectionTypes = const [ConnectionType.USB],
     bool androidUsesFineLocation = false,
+    int cloudPrinterNum = 1,
   }) async {
     if (connectionTypes.isEmpty) {
       throw Exception('No connection type provided');
     }
-
+    _devices.clear();
+    _sentDeviceKeys.clear();
     if (connectionTypes.contains(ConnectionType.USB)) {
-      await _getUSBPrinters();
+      debugPrint("getUSBDevices");
+      await stopScan(stopUsb: true, stopBle: false, stopNetwork: false);
+      _updateScanningState(ConnectionType.USB, true);
+      await _getUSBDevices();
     }
 
     if (connectionTypes.contains(ConnectionType.BLE)) {
-      await _getBLEPrinters(androidUsesFineLocation);
+      debugPrint("getBLEDevices");
+      if (Platform.isAndroid) {
+        await turnOnBluetooth();
+        await stopScan(stopUsb: false, stopBle: true, stopNetwork: false);
+        _updateScanningState(ConnectionType.BLE, true);
+        await _getBleDevices(androidUsesFineLocation);
+      }
+    }
+    if (connectionTypes.contains(ConnectionType.NETWORK)) {
+      debugPrint("getWIFIDevices");
+      await stopScan(stopUsb: false, stopBle: false, stopNetwork: true);
+      _updateScanningState(ConnectionType.NETWORK, true);
+      await _getNetworkDevices(cloudPrinterNum);
     }
   }
 
-  Future<void> _getUSBPrinters() async {
+  Future<void> _getUSBDevices() async {
     try {
       final devices =
           await FlutterThermalPrinterPlatform.instance.startUsbScan();
 
-      List<Printer> usbPrinters = [];
+      List<DeviceModel> usbPrinters = [];
       for (var map in devices) {
-        final printer = Printer(
+        final printer = DeviceModel(
           vendorId: map['vendorId'].toString(),
           productId: map['productId'].toString(),
           name: map['name'],
@@ -231,9 +303,10 @@ class OtherPrinterManager {
 
       _devices.addAll(usbPrinters);
       _usbSubscription?.cancel();
-      _usbSubscription = eventChannel.receiveBroadcastStream().listen((event) {
+      _usbSubscription =
+          _deviceEventChannel.receiveBroadcastStream().listen((event) {
         final map = Map<String, dynamic>.from(event);
-        _updateOrAddPrinter(Printer(
+        _updateOrAddPrinter(DeviceModel(
           vendorId: map['vendorId'].toString(),
           productId: map['productId'].toString(),
           name: map['name'],
@@ -243,16 +316,16 @@ class OtherPrinterManager {
         ));
       });
 
-      sortDevices();
+      _sortDevices();
     } catch (e) {
       log("$e [USB Connection]");
     }
   }
 
-  Future<void> _getBLEPrinters(bool androidUsesFineLocation) async {
+  Future<void> _getBleDevices(bool androidUsesFineLocation) async {
     try {
-      subscription?.cancel();
-      subscription = null;
+      _bleSubscription?.cancel();
+      _bleSubscription = null;
       if (isIos == false) {
         if (await blueClassic.adapterStateNow != BluetoothAdapterState.on) {
           turnOnBluetooth();
@@ -274,12 +347,12 @@ class OtherPrinterManager {
         _devices.addAll(bondedDevices);
       }
 
-      sortDevices();
+      _sortDevices();
 
       // Listen to scan results
-      subscription = blueClassic.scanResults.listen((result) {
+      _bleSubscription = blueClassic.scanResults.listen((result) {
         BluetoothDevice bluetoothDevice = result;
-        Printer printer = Printer(
+        DeviceModel printer = DeviceModel(
           address: bluetoothDevice.address,
           name: bluetoothDevice.name,
           connectionType: ConnectionType.BLE,
@@ -293,12 +366,12 @@ class OtherPrinterManager {
     }
   }
 
-  Future<List<Printer>> _getBLEBondedDevices() async {
+  Future<List<DeviceModel>> _getBLEBondedDevices() async {
     List<BluetoothDevice>? bondedDevices = await blueClassic.bondedDevices;
     if (bondedDevices == null) return [];
-    List<Printer> printers = [];
+    List<DeviceModel> printers = [];
     for (var device in bondedDevices) {
-      printers.add(Printer(
+      printers.add(DeviceModel(
         address: device.address,
         name: device.name,
         rssi: device.rssi,
@@ -310,7 +383,129 @@ class OtherPrinterManager {
     return printers;
   }
 
-  void _updateOrAddPrinter(Printer printer) {
+  Future<void> _getNetworkDevices(int cloudPrinterNum) async {
+    String? ip = await _getLocalIP();
+    if (ip != null) {
+      // subnet
+      final subnet = ip.substring(0, ip.lastIndexOf('.'));
+
+      // Process IPs in concurrent batches for faster scanning
+      const int batchSize = 25; // Process 25 IPs concurrently per batch
+      const int maxConcurrency = 50; // Maximum concurrent operations
+
+      List<Future<void>> allBatches = [];
+
+      for (int startIp = 1; startIp <= 255; startIp += batchSize) {
+        if (!_scanningState[ConnectionType.NETWORK]!) break;
+
+        int endIp = (startIp + batchSize - 1).clamp(1, 255);
+        allBatches.add(
+          _processBatchOfIPs(subnet, startIp, endIp, cloudPrinterNum),
+        );
+
+        // Limit concurrent batches to avoid overwhelming the system
+        if (allBatches.length >= maxConcurrency ~/ batchSize) {
+          await Future.wait(allBatches);
+          allBatches.clear();
+
+          // Check if we found enough devices
+          final foundDevices = _devices
+              .where((d) => d.connectionType == ConnectionType.NETWORK)
+              .length;
+          if (foundDevices >= cloudPrinterNum) {
+            break;
+          }
+        }
+      }
+
+      // Wait for remaining batches
+      if (allBatches.isNotEmpty) {
+        await Future.wait(allBatches);
+      }
+      _updateScanningState(ConnectionType.NETWORK, false);
+
+      // remove duplicates by address
+      _devices.removeWhere(
+        (device) => device.address == null || device.address == '',
+      );
+      _sortDevices();
+    }
+  }
+
+  Future<void> _processBatchOfIPs(
+    String subnet,
+    int startIp,
+    int endIp,
+    int maxDevices,
+  ) async {
+    if (!_scanningState[ConnectionType.NETWORK]!) return;
+
+    List<Future<DeviceModel?>> pingFutures = [];
+
+    for (int i = startIp; i <= endIp; i++) {
+      if (!_scanningState[ConnectionType.NETWORK]!) return;
+
+      final deviceIp = '$subnet.$i';
+      pingFutures.add(_pingAndCreateDevice(deviceIp, i));
+    }
+
+    try {
+      final results = await Future.wait(pingFutures);
+
+      for (final device in results) {
+        if (device != null && _scanningState[ConnectionType.NETWORK]!) {
+          debugPrint('Valid device found ${device.address}');
+          _devices.add(device);
+
+          // Check if we've reached the limit
+          final networkDeviceCount = _devices
+              .where((d) => d.connectionType == ConnectionType.NETWORK)
+              .length;
+          if (networkDeviceCount >= maxDevices) {
+            _updateScanningState(ConnectionType.NETWORK, false);
+            break;
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('Error in batch processing: $e');
+    }
+  }
+
+  Future<DeviceModel?> _pingAndCreateDevice(String ip, int deviceNumber) async {
+    try {
+      final isValid = await _pingConnection(ip);
+      if (isValid) {
+        return DeviceModel(
+          address: ip,
+          name: 'Cloud Printer $deviceNumber',
+          connectionType: ConnectionType.NETWORK,
+          isConnected: false,
+        );
+      }
+      return null;
+    } catch (error) {
+      debugPrint('Failed to ping $ip ${error.toString()}');
+      return null;
+    }
+  }
+
+  Future<bool> _pingConnection(String ip) async {
+    try {
+      final socket = await Socket.connect(
+        ip,
+        _port,
+        timeout: const Duration(seconds: 2),
+      );
+      socket.destroy();
+      return true;
+    } catch (error) {
+      debugPrint('Failed to ping $ip ${error.toString()}');
+      return false;
+    }
+  }
+
+  void _updateOrAddPrinter(DeviceModel printer) {
     final index =
         _devices.indexWhere((device) => device.address == printer.address);
     if (index == -1) {
@@ -318,10 +513,10 @@ class OtherPrinterManager {
     } else {
       _devices[index] = printer;
     }
-    sortDevices();
+    _sortDevices();
   }
 
-  void sortDevices() {
+  void _sortDevices() {
     _devices
         .removeWhere((element) => element.name == null || element.name == '');
     // remove items having same vendorId
@@ -339,7 +534,20 @@ class OtherPrinterManager {
   }
 
   Future<void> turnOnBluetooth() async {
-    blueClassic.turnOn();
+    bool isSupported = await blueClassic.isSupported;
+    if (!isSupported) {
+      log("Bluetooth not supported by this device");
+      return;
+    }
+    if (!kIsWeb && Platform.isAndroid) {
+      blueClassic.turnOn();
+    }
+  }
+
+  Future<String?> _getLocalIP() async {
+    final info = NetworkInfo();
+    final wifiIP = await info.getWifiIP();
+    return wifiIP;
   }
 
   Stream<bool> get isBleTurnedOnStream {
@@ -348,5 +556,16 @@ class OtherPrinterManager {
         return event == BluetoothAdapterState.on;
       },
     );
+  }
+
+  // Helper methods to update scanning state
+  void _updateScanningState(ConnectionType type, bool isScanning) {
+    // Only emit if state actually changed
+    if (_scanningState[type] != isScanning) {
+      _scanningState[type] = isScanning;
+      _scanningStream.add(
+        ScanningEvent(connectionType: type, isScanning: isScanning),
+      );
+    }
   }
 }
