@@ -8,12 +8,13 @@ import android.app.PendingIntent;
 import android.content.Context;
 import android.content.Intent;
 import android.hardware.usb.UsbConstants;
+import android.hardware.usb.UsbInterface;
 import android.hardware.usb.UsbDevice;
 import android.hardware.usb.UsbDeviceConnection;
 import android.hardware.usb.UsbEndpoint;
 import android.hardware.usb.UsbManager;
 import android.os.Build;
-
+import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -23,10 +24,14 @@ import java.util.Objects;
 import android.content.BroadcastReceiver;
 import android.content.IntentFilter;
 import android.util.Log;
+import java.nio.charset.StandardCharsets;
+import android.os.Handler;
+import android.os.Looper;
+
 
 import io.flutter.plugin.common.EventChannel;
 
-public class UsbDevicesManager implements EventChannel.StreamHandler {
+public class UsbDevicesManager {
     @SuppressLint("StaticFieldLeak")
     private static Context context;
 
@@ -36,7 +41,7 @@ public class UsbDevicesManager implements EventChannel.StreamHandler {
     private static final String TAG = "FPP";
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
 
-    private EventChannel.EventSink events;
+    private EventChannel.EventSink deviceEventSink;
     private EventChannel.EventSink callerIdEventSink;
 
     private BroadcastReceiver usbStateChangeReceiver;
@@ -53,6 +58,44 @@ public class UsbDevicesManager implements EventChannel.StreamHandler {
     private static final String ACK = "ACK\r\n";
     private static final String DCK = "DCK\r\n";
     private static PendingIntent mPermissionIntent;
+
+    public EventChannel.StreamHandler getDeviceStreamHandler() {
+        return new EventChannel.StreamHandler() {
+            @Override
+            public void onListen(Object args, EventChannel.EventSink events) {
+                deviceEventSink = events;
+                createUsbStateChangeReceiver();
+                IntentFilter filter = new IntentFilter();
+                filter.addAction(ACTION_USB_ATTACHED);
+                filter.addAction(ACTION_USB_DETACHED);
+                filter.addAction(ACTION_USB_PERMISSION);
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                    context.registerReceiver(usbStateChangeReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
+                } else {
+                    context.registerReceiver(usbStateChangeReceiver, filter);
+                }
+            }
+
+            @Override
+            public void onCancel(Object args) {
+                context.unregisterReceiver(usbStateChangeReceiver);
+                deviceEventSink = null;
+            }
+        };
+    }
+    public EventChannel.StreamHandler getCallerIdStreamHandler() {
+        return new EventChannel.StreamHandler() {
+            @Override
+            public void onListen(Object args, EventChannel.EventSink events) {
+                callerIdEventSink = events;
+            }
+
+            @Override
+            public void onCancel(Object args) {
+                callerIdEventSink = null;
+            }
+        };
+    }
 
     private void createUsbStateChangeReceiver() {
         usbStateChangeReceiver = new BroadcastReceiver() {
@@ -89,21 +132,7 @@ public class UsbDevicesManager implements EventChannel.StreamHandler {
         };
     }
 
-    @SuppressLint("UnspecifiedRegisterReceiverFlag")
-    @Override
-    public void onListen(Object arguments, EventChannel.EventSink events) {
-        this.events = events;
-        IntentFilter filter = new IntentFilter();
-        filter.addAction(ACTION_USB_ATTACHED);
-        filter.addAction(ACTION_USB_DETACHED);
-        filter.addAction(ACTION_USB_PERMISSION);
-        createUsbStateChangeReceiver();
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            context.registerReceiver(usbStateChangeReceiver, filter, Context.RECEIVER_NOT_EXPORTED);
-        } else {
-            context.registerReceiver(usbStateChangeReceiver, filter);
-        }
-    }
+
 
 
     private void sendDevice(UsbDevice device, boolean isRemove) {
@@ -127,13 +156,6 @@ public class UsbDevicesManager implements EventChannel.StreamHandler {
 
     }
 
-    @Override
-    public void onCancel(Object arguments) {
-        if (events != null) {
-            context.unregisterReceiver(usbStateChangeReceiver);
-            events = null;
-        }
-    }
 
 
     UsbDevicesManager(Context context) {

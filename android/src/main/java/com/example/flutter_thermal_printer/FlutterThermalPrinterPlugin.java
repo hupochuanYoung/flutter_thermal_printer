@@ -36,7 +36,7 @@ public class FlutterThermalPrinterPlugin implements FlutterPlugin, MethodCallHan
         channel.setMethodCallHandler(this);
         context = flutterPluginBinding.getApplicationContext();
         usbDevicesManager = new UsbDevicesManager(context);
-        deviceEventChannel.setStreamHandler(usbDevicesManager);
+        deviceEventChannel.setStreamHandler(usbDevicesManager.getDeviceStreamHandler());
         callerIdEventChannel.setStreamHandler(usbDevicesManager.getCallerIdStreamHandler());
 
     }

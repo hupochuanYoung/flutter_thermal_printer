@@ -105,11 +105,7 @@ class FlutterThermalPrinter {
   }
 
   Future<void> getDevices({
-    Duration refreshDuration = const Duration(seconds: 2),
-    List<ConnectionType> connectionTypes = const [
-      ConnectionType.USB,
-      ConnectionType.BLE
-    ],
+    List<ConnectionType> connectionTypes = const [ConnectionType.USB],
     bool androidUsesFineLocation = false,
     int cloudPrinterNum = 1,
   }) async {

@@ -1,5 +1,5 @@
 package com.example.flutter_thermal_printer.utils;
-import com.orderit.callerid.flutter_callerid.BuildConfig;
+import com.example.flutter_thermal_printer.BuildConfig;
 
 import android.util.Log;
 
