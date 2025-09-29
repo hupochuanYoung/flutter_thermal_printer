@@ -111,12 +111,14 @@ class FlutterThermalPrinter {
       ConnectionType.BLE
     ],
     bool androidUsesFineLocation = false,
+    int cloudPrinterNum = 1,
   }) async {
     if (Platform.isWindows) {
     } else {
       OtherPrinterManager.instance.getDevices(
         connectionTypes: connectionTypes,
         androidUsesFineLocation: androidUsesFineLocation,
+        cloudPrinterNum: cloudPrinterNum,
       );
     }
   }
