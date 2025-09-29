@@ -1,6 +1,7 @@
 package com.example.flutter_thermal_printer;
 
 import static android.content.Context.USB_SERVICE;
+import com.example.flutter_thermal_printer.utils.AppLogger;
 
 import android.annotation.SuppressLint;
 import android.app.PendingIntent;
