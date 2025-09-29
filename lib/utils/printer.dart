@@ -18,6 +18,7 @@ class DeviceModel {
   String? vendorId;
   String? productId;
   int? rssi;
+  bool? isRemove;
 
   DeviceModel({
     this.address,
@@ -27,6 +28,7 @@ class DeviceModel {
     this.vendorId,
     this.productId,
     this.rssi,
+    this.isRemove,
   });
 
   DeviceModel.fromJson(Map<String, dynamic> json) {
@@ -38,6 +40,7 @@ class DeviceModel {
     vendorId = json['vendorId'];
     productId = json['productId'];
     rssi = json['rssi'];
+    isRemove = json['isRemove'];
   }
 
   Map<String, dynamic> toJson() {
@@ -53,6 +56,7 @@ class DeviceModel {
     data['vendorId'] = vendorId;
     data['rssi'] = rssi;
     data['productId'] = productId;
+    data['isRemove'] = isRemove;
     return data;
   }
 
