@@ -36,11 +36,13 @@ class _MyAppState extends State<MyApp> {
       ConnectionType.USB,
       ConnectionType.BLE,
     ]);
-    _devicesStreamSubscription = _flutterThermalPrinterPlugin.devicesStream.listen((List<Printer> event) {
+    _devicesStreamSubscription = _flutterThermalPrinterPlugin.devicesStream
+        .listen((List<Printer> event) {
       log(event.map((e) => e.name).toList().toString());
       setState(() {
         printers = event;
-        printers.removeWhere((element) => element.name == null || element.name == '');
+        printers.removeWhere(
+            (element) => element.name == null || element.name == '');
       });
     });
   }
@@ -112,7 +114,8 @@ class _MyAppState extends State<MyApp> {
                         final generator = Generator(PaperSize.mm80, profile);
                         List<int> bytes = [];
                         if (context.mounted) {
-                          bytes = await FlutterThermalPrinter.instance.screenShotWidget(
+                          bytes = await FlutterThermalPrinter.instance
+                              .screenShotWidget(
                             context,
                             generator: generator,
                             widget: receiptWidget("Network"),
@@ -129,7 +132,8 @@ class _MyAppState extends State<MyApp> {
                   Expanded(
                     child: ElevatedButton(
                       onPressed: () async {
-                        final service = FlutterThermalPrinterNetwork(_ip, port: int.parse(_port));
+                        final service = FlutterThermalPrinterNetwork(_ip,
+                            port: int.parse(_port));
                         await service.connect();
                         final bytes = await _generateReceipt();
                         await service.printTicket(bytes);
@@ -163,10 +167,22 @@ class _MyAppState extends State<MyApp> {
                   Expanded(
                     child: ElevatedButton(
                       onPressed: () {
-                        // startScan();
                         stopScan();
                       },
                       child: const Text('Stop Scan'),
+                    ),
+                  ),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () async {
+                        await _flutterThermalPrinterPlugin.printWidget(
+                          context,
+                          printer: printers[1],
+                          widget:
+                              receiptWidget(printers[1].connectionTypeString),
+                        );
+                      },
+                      child: const Text('Print receipt'),
                     ),
                   ),
                 ],
@@ -179,13 +195,19 @@ class _MyAppState extends State<MyApp> {
                     return ListTile(
                       onTap: () async {
                         if (printers[index].isConnected ?? false) {
-                          await _flutterThermalPrinterPlugin.disconnect(printers[index]);
+                          await _flutterThermalPrinterPlugin
+                              .disconnect(printers[index]);
                         } else {
-                          await _flutterThermalPrinterPlugin.connect(printers[index]);
+                          bool res = await _flutterThermalPrinterPlugin
+                              .connect(printers[index]);
+                          setState(() {
+                            printers[index].isConnected = res;
+                          });
                         }
                       },
                       title: Text(printers[index].name ?? 'No Name'),
-                      subtitle: Text("Connected: ${printers[index].isConnected}"),
+                      subtitle:
+                          Text("Connected: ${printers[index].isConnected}"),
                       trailing: IconButton(
                         icon: const Icon(Icons.connect_without_contact),
                         onPressed: () async {
@@ -268,7 +290,8 @@ class _MyAppState extends State<MyApp> {
   }
 }
 
-Widget _buildReceiptRow(String leftText, String rightText, {bool isBold = false}) {
+Widget _buildReceiptRow(String leftText, String rightText,
+    {bool isBold = false}) {
   return Padding(
     padding: const EdgeInsets.symmetric(vertical: 4.0),
     child: Row(
@@ -276,11 +299,15 @@ Widget _buildReceiptRow(String leftText, String rightText, {bool isBold = false}
       children: [
         Text(
           leftText,
-          style: TextStyle(fontSize: 16, fontWeight: isBold ? FontWeight.bold : FontWeight.normal),
+          style: TextStyle(
+              fontSize: 16,
+              fontWeight: isBold ? FontWeight.bold : FontWeight.normal),
         ),
         Text(
           rightText,
-          style: TextStyle(fontSize: 16, fontWeight: isBold ? FontWeight.bold : FontWeight.normal),
+          style: TextStyle(
+              fontSize: 16,
+              fontWeight: isBold ? FontWeight.bold : FontWeight.normal),
         ),
       ],
     ),

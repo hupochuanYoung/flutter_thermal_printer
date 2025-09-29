@@ -55,20 +55,61 @@ class OtherPrinterManager {
       return await FlutterThermalPrinterPlatform.instance.connect(device);
     } else {
       try {
+        // bondDevice if not bonded
+        await bondDevice(device.address!);
         return await bluetoothConnect(device.address!);
       } catch (e) {
+        debugPrint('connect $e');
         return false;
       }
     }
   }
 
+  Future<bool> bondDevice(String address) async {
+    try {
+      List<BluetoothDevice>? bondedDevices = await blueClassic.bondedDevices;
+      for (var device in bondedDevices!) {
+        if (device.address == address) {
+          return true;
+        }
+      }
+      await blueClassic.bondDevice(address);
+      return true;
+    } catch (e) {
+      debugPrint('bondDevice $e');
+      return false;
+    }
+  }
+
   Future<bool> bluetoothConnect(String address) async {
     try {
+      // Clean up any existing connection first
+      if (_activeBluetoothConnections.containsKey(address)) {
+        try {
+          await _activeBluetoothConnections[address]?.close();
+        } catch (e) {
+          debugPrint('Failed to close existing connection: $e');
+        }
+        _activeBluetoothConnections.remove(address);
+      }
+
+      // 建立连接，增加超时时间
       BluetoothConnection? bt = await blueClassic.connect(address);
       if (bt == null) return false;
+      await Future.delayed(const Duration(milliseconds: 500));
+
+      // Verify the connection is actually established
+      if (!bt.isConnected) {
+        debugPrint('Bluetooth connection not established for $address');
+        // await bt.close();
+        return false;
+      }
+
       _activeBluetoothConnections[address] = bt;
       return bt.isConnected;
     } catch (e) {
+      debugPrint('bluetoothConnect $e');
+      _activeBluetoothConnections.remove(address);
       return false;
     }
   }
