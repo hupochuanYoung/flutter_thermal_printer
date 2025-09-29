@@ -32,7 +32,7 @@ class _MyAppState extends State<MyApp> {
   // Get Printer List
   void startScan() async {
     _devicesStreamSubscription?.cancel();
-    await _flutterThermalPrinterPlugin.getPrinters(connectionTypes: [
+    await _flutterThermalPrinterPlugin.getDevices(connectionTypes: [
       ConnectionType.USB,
       ConnectionType.BLE,
     ]);

@@ -22,11 +22,44 @@ class FlutterThermalPrinter {
     return _instance!;
   }
 
+  Stream<Map<String, dynamic>> get callerIdStream {
+    if (Platform.isWindows) {
+      return Stream.value({});
+    } else {
+      return OtherPrinterManager.instance.callerIdStream;
+    }
+  }
+
+  Stream<ScanningEvent> get scanningStream {
+    if (Platform.isWindows) {
+      return Stream.value(
+          ScanningEvent(connectionType: ConnectionType.USB, isScanning: false));
+    } else {
+      return OtherPrinterManager.instance.scanningStream;
+    }
+  }
+
   Stream<List<DeviceModel>> get devicesStream {
     if (Platform.isWindows) {
       return Stream.value([]);
     } else {
       return OtherPrinterManager.instance.devicesStream;
+    }
+  }
+
+  Future<bool> stopListening() async {
+    if (Platform.isWindows) {
+      return false;
+    } else {
+      return await OtherPrinterManager.instance.stopListening();
+    }
+  }
+
+  Future<bool> startListening(DeviceModel device) async {
+    if (Platform.isWindows) {
+      return false;
+    } else {
+      return await OtherPrinterManager.instance.startListening(device);
     }
   }
 
@@ -63,7 +96,7 @@ class FlutterThermalPrinter {
     }
   }
 
-  Future<void> getPrinters({
+  Future<void> getDevices({
     Duration refreshDuration = const Duration(seconds: 2),
     List<ConnectionType> connectionTypes = const [
       ConnectionType.USB,
@@ -80,10 +113,18 @@ class FlutterThermalPrinter {
     }
   }
 
-  Future<void> stopScan() async {
+  Future<void> stopScan({
+    bool stopBle = true,
+    bool stopUsb = true,
+    bool stopNetwork = true,
+  }) async {
     if (Platform.isWindows) {
     } else {
-      OtherPrinterManager.instance.stopScan();
+      OtherPrinterManager.instance.stopScan(
+        stopBle: stopBle,
+        stopUsb: stopUsb,
+        stopNetwork: stopNetwork,
+      );
     }
   }
 
