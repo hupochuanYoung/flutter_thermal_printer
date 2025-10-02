@@ -8,6 +8,7 @@ import 'package:flutter_blue_classic/flutter_blue_classic.dart';
 import 'package:network_info_plus/network_info_plus.dart';
 import 'package:flutter_thermal_printer/flutter_thermal_printer_platform_interface.dart';
 import 'package:flutter_thermal_printer/utils/printer.dart';
+import 'package:flutter_thermal_printer/utils/bluetooth_performance_config.dart';
 
 class OtherPrinterManager {
   OtherPrinterManager._privateConstructor();
@@ -19,9 +20,24 @@ class OtherPrinterManager {
     return _instance!;
   }
 
-  final StreamController<List<DeviceModel>> _devicesstream = StreamController<List<DeviceModel>>.broadcast();
-  final StreamController<Map<String, dynamic>> _callerIdStream = StreamController<Map<String, dynamic>>.broadcast();
-  final StreamController<ScanningEvent> _scanningStream = StreamController<ScanningEvent>.broadcast();
+  // 性能配置参数
+  static const int _defaultChunkSize = 2048;
+  static const int _defaultDelayMs = 2;
+  static const int _defaultLargeDataThreshold = 4096;
+  static const int _defaultExtremeDataThreshold = 8192;
+
+  // 可配置的性能参数
+  int _bluetoothChunkSize = _defaultChunkSize;
+  int _bluetoothDelayMs = _defaultDelayMs;
+  int _largeDataThreshold = _defaultLargeDataThreshold;
+  int _extremeDataThreshold = _defaultExtremeDataThreshold;
+
+  final StreamController<List<DeviceModel>> _devicesstream =
+      StreamController<List<DeviceModel>>.broadcast();
+  final StreamController<Map<String, dynamic>> _callerIdStream =
+      StreamController<Map<String, dynamic>>.broadcast();
+  final StreamController<ScanningEvent> _scanningStream =
+      StreamController<ScanningEvent>.broadcast();
 
   Stream<List<DeviceModel>> get devicesStream => _devicesstream.stream;
 
@@ -39,10 +55,15 @@ class OtherPrinterManager {
 
   // Track active connections
   final Map<String, BluetoothConnection> _activeBluetoothConnections = {};
+  final Map<String, DateTime> _lastConnectionCheck = {};
+  final Map<String, int> _connectionFailureCount =
+      {}; // Track connection failures per device
   final int _port = 9100;
 
-  static const String _deviceChannelName = 'flutter_thermal_printer/device_events';
-  static const String _callerIdChannelName = 'flutter_thermal_printer/callerid_events';
+  static const String _deviceChannelName =
+      'flutter_thermal_printer/device_events';
+  static const String _callerIdChannelName =
+      'flutter_thermal_printer/callerid_events';
 
   final EventChannel _deviceEventChannel = EventChannel(_deviceChannelName);
   final EventChannel _callerIdEventChannel = EventChannel(_callerIdChannelName);
@@ -67,7 +88,8 @@ class OtherPrinterManager {
 
   Future<bool> startListening(DeviceModel device) async {
     _callerIdSubscription?.cancel();
-    _callerIdSubscription = _callerIdEventChannel.receiveBroadcastStream().listen((event) {
+    _callerIdSubscription =
+        _callerIdEventChannel.receiveBroadcastStream().listen((event) {
       final map = Map<String, dynamic>.from(event);
       log("Received Caller ID: ${map['caller']} at ${map['datetime']}");
       _callerIdStream.add(map);
@@ -142,36 +164,83 @@ class OtherPrinterManager {
   }
 
   Future<bool> bluetoothConnect(String address) async {
-    try {
-      // Clean up any existing connection first
-      if (_activeBluetoothConnections.containsKey(address)) {
-        try {
-          await _activeBluetoothConnections[address]?.close();
-        } catch (e) {
-          debugPrint('Failed to close existing connection: $e');
+    const int maxRetryAttempts = 3;
+    const Duration baseTimeout = Duration(seconds: 10);
+
+    for (int attempt = 1; attempt <= maxRetryAttempts; attempt++) {
+      try {
+        log('Bluetooth connection attempt $attempt/$maxRetryAttempts for $address');
+
+        // Clean up any existing connection first
+        if (_activeBluetoothConnections.containsKey(address)) {
+          try {
+            await _activeBluetoothConnections[address]?.close();
+          } catch (e) {
+            debugPrint('Failed to close existing connection: $e');
+          }
+          _activeBluetoothConnections.remove(address);
         }
+
+        // Add delay between retry attempts (exponential backoff)
+        if (attempt > 1) {
+          final delayDuration = Duration(milliseconds: 1000 * attempt);
+          log('Waiting ${delayDuration.inMilliseconds}ms before retry...');
+          await Future.delayed(delayDuration);
+        }
+
+        // 建立连接，使用超时控制
+        BluetoothConnection? bt =
+            await blueClassic.connect(address).timeout(baseTimeout);
+        if (bt == null) {
+          log('Failed to establish Bluetooth connection - returned null');
+          continue;
+        }
+
+        // 减少连接后的等待时间，仅保留必要的稳定时间
+        await Future.delayed(const Duration(milliseconds: 200));
+
+        // Verify the connection is actually established
+        if (!bt.isConnected) {
+          log('Bluetooth connection not established for $address');
+          continue;
+        }
+
+        _activeBluetoothConnections[address] = bt;
+        log('Successfully connected to $address on attempt $attempt');
+        // Reset failure count on successful connection
+        _connectionFailureCount.remove(address);
+        return true;
+      } catch (e) {
+        log('Bluetooth connect attempt $attempt failed: $e');
         _activeBluetoothConnections.remove(address);
+
+        if (attempt == maxRetryAttempts) {
+          log('All connection attempts failed for $address');
+          // Increment failure count and apply adaptive configuration
+          _connectionFailureCount[address] =
+              (_connectionFailureCount[address] ?? 0) + 1;
+          final failureCount = _connectionFailureCount[address]!;
+          log('Connection failure count for $address: $failureCount');
+
+          // Apply adaptive performance configuration
+          final adaptiveConfig =
+              BluetoothPerformanceConfig.adaptive(failureCount);
+          configureBluetoothPerformance(adaptiveConfig);
+          log('Applied adaptive configuration: ${adaptiveConfig.mode.name} for $address');
+
+          return false;
+        }
+
+        // Don't retry for certain types of errors
+        if (e.toString().contains('device is not paired') ||
+            e.toString().contains('device not found')) {
+          log('Non-retryable error: $e');
+          return false;
+        }
       }
-
-      // 建立连接，增加超时时间
-      BluetoothConnection? bt = await blueClassic.connect(address);
-      if (bt == null) return false;
-      await Future.delayed(const Duration(milliseconds: 500));
-
-      // Verify the connection is actually established
-      if (!bt.isConnected) {
-        debugPrint('Bluetooth connection not established for $address');
-        // await bt.close();
-        return false;
-      }
-
-      _activeBluetoothConnections[address] = bt;
-      return bt.isConnected;
-    } catch (e) {
-      debugPrint('bluetoothConnect $e');
-      _activeBluetoothConnections.remove(address);
-      return false;
     }
+
+    return false;
   }
 
   Future<bool> isConnected(DeviceModel device) async {
@@ -230,20 +299,57 @@ class OtherPrinterManager {
           log('Device is not connected');
           return;
         }
+        // 智能连接检查：避免频繁重新连接
         if (!bt.isConnected) {
-          bool isConnected = await bluetoothConnect(device.address!);
-          if (!isConnected) {
-            log('isConnected fail');
-            return;
+          bool shouldReconnect = true;
+          String address = device.address!;
+
+          // 如果在合理时间内最近检查过，跳过重新连接检查
+          if (_lastConnectionCheck.containsKey(address)) {
+            final lastCheck = _lastConnectionCheck[address]!;
+            final timeSinceLastCheck = DateTime.now().difference(lastCheck);
+            if (timeSinceLastCheck.inSeconds < 15) {
+              // Increased from 10 to 15 seconds
+              // 如果最近15秒内检查过连接，尝试直接发送而不重新连接
+              // 这在打印任务连续时特别有用
+              try {
+                log('Attempting direct send without reconnection...');
+                bt.output.add(Uint8List.fromList(bytes));
+                await bt.output.allSent
+                    .timeout(Duration(seconds: 5)); // Add timeout
+                log('Direct send successful');
+                return;
+              } catch (e) {
+                log('Direct send failed, will reconnect: $e');
+                // 如果直接发送失败，则进行重新连接
+                shouldReconnect = true;
+              }
+            }
           }
+
+          if (shouldReconnect) {
+            log('Attempting reconnection for $address...');
+            bool isConnected = await bluetoothConnect(address);
+            if (!isConnected) {
+              log('Reconnection failed for $address');
+              return;
+            }
+            _lastConnectionCheck[address] = DateTime.now();
+            log('Successfully reconnected to $address');
+          }
+        } else {
+          // 更新最后检查时间
+          _lastConnectionCheck[device.address!] = DateTime.now();
         }
 
-        // 对于蓝牙设备，如果数据较长或明确标记为长数据，进行分片发送
-        if (longData || bytes.length > 2048) {
-          await _sendDataInChunks(bt, bytes);
+        // 优化的蓝牙发送策略：使用可配置的阈值
+        if (longData || bytes.length > _largeDataThreshold) {
+          log('Sending large data (${bytes.length} bytes) in chunks');
+          await _sendDataInChunksOptimized(bt, bytes);
         } else {
+          log('Sending data (${bytes.length} bytes)');
           bt.output.add(Uint8List.fromList(bytes));
-          await bt.output.allSent;
+          await bt.output.allSent.timeout(Duration(seconds: 10)); // Add timeout
         }
         return;
       } catch (e) {
@@ -252,21 +358,31 @@ class OtherPrinterManager {
     }
   }
 
-  // 分片发送数据到蓝牙设备
-  Future<void> _sendDataInChunks(BluetoothConnection bt, List<int> bytes) async {
-    const int chunkSize = 1024; // 每片1024字节，平衡速度和稳定性
-    const int delayMs = 5; // 减少延迟到5ms，提高流畅性
-
-    for (int i = 0; i < bytes.length; i += chunkSize) {
-      int end = (i + chunkSize < bytes.length) ? i + chunkSize : bytes.length;
+  // 优化的分片发送策略：使用可配置的参数
+  Future<void> _sendDataInChunksOptimized(
+      BluetoothConnection bt, List<int> bytes) async {
+    for (int i = 0; i < bytes.length; i += _bluetoothChunkSize) {
+      int end = (i + _bluetoothChunkSize < bytes.length)
+          ? i + _bluetoothChunkSize
+          : bytes.length;
       List<int> chunk = bytes.sublist(i, end);
 
-      bt.output.add(Uint8List.fromList(chunk));
-      await bt.output.allSent;
+      log('Sending chunk ${(i ~/ _bluetoothChunkSize) + 1}/'
+          '${(bytes.length / _bluetoothChunkSize).ceil()} '
+          '(${chunk.length} bytes)');
 
-      // 只在必要时添加延迟
-      if (end < bytes.length && bytes.length > 4096) {
-        await Future.delayed(const Duration(milliseconds: delayMs));
+      try {
+        bt.output.add(Uint8List.fromList(chunk));
+        await bt.output.allSent
+            .timeout(Duration(seconds: 5)); // Add timeout per chunk
+
+        // 只在极端大数据时添加延迟
+        if (end < bytes.length && bytes.length > _extremeDataThreshold) {
+          await Future.delayed(Duration(milliseconds: _bluetoothDelayMs));
+        }
+      } catch (e) {
+        log('Failed to send chunk ${(i ~/ _bluetoothChunkSize) + 1}: $e');
+        rethrow; // Let the calling method handle the error
       }
     }
   }
@@ -308,7 +424,8 @@ class OtherPrinterManager {
 
   Future<void> _getUSBDevices() async {
     try {
-      final devices = await FlutterThermalPrinterPlatform.instance.startUsbScan();
+      final devices =
+          await FlutterThermalPrinterPlatform.instance.startUsbScan();
 
       List<DeviceModel> usbPrinters = [];
       for (var map in devices) {
@@ -320,13 +437,15 @@ class OtherPrinterManager {
           address: map['vendorId'].toString(),
           isConnected: map['connected'] ?? false,
         );
-        printer.isConnected = await FlutterThermalPrinterPlatform.instance.isConnected(printer);
+        printer.isConnected =
+            await FlutterThermalPrinterPlatform.instance.isConnected(printer);
         usbPrinters.add(printer);
       }
 
       _devices.addAll(usbPrinters);
       _usbSubscription?.cancel();
-      _usbSubscription = _deviceEventChannel.receiveBroadcastStream().listen((event) {
+      _usbSubscription =
+          _deviceEventChannel.receiveBroadcastStream().listen((event) {
         final map = Map<String, dynamic>.from(event);
         _updateOrAddPrinter(DeviceModel(
           vendorId: map['vendorId'].toString(),
@@ -379,7 +498,8 @@ class OtherPrinterManager {
           name: bluetoothDevice.name,
           connectionType: ConnectionType.BLE,
           rssi: bluetoothDevice.rssi,
-          isConnected: _activeBluetoothConnections.containsKey(bluetoothDevice.address),
+          isConnected:
+              _activeBluetoothConnections.containsKey(bluetoothDevice.address),
         );
         _updateOrAddPrinter(printer);
       });
@@ -431,7 +551,9 @@ class OtherPrinterManager {
           allBatches.clear();
 
           // Check if we found enough devices
-          final foundDevices = _devices.where((d) => d.connectionType == ConnectionType.NETWORK).length;
+          final foundDevices = _devices
+              .where((d) => d.connectionType == ConnectionType.NETWORK)
+              .length;
           if (foundDevices >= cloudPrinterNum) {
             break;
           }
@@ -478,7 +600,9 @@ class OtherPrinterManager {
           _devices.add(device);
 
           // Check if we've reached the limit
-          final networkDeviceCount = _devices.where((d) => d.connectionType == ConnectionType.NETWORK).length;
+          final networkDeviceCount = _devices
+              .where((d) => d.connectionType == ConnectionType.NETWORK)
+              .length;
           if (networkDeviceCount >= maxDevices) {
             _updateScanningState(ConnectionType.NETWORK, false);
             break;
@@ -524,7 +648,8 @@ class OtherPrinterManager {
   }
 
   void _updateOrAddPrinter(DeviceModel printer) {
-    final index = _devices.indexWhere((device) => device.address == printer.address);
+    final index =
+        _devices.indexWhere((device) => device.address == printer.address);
     if (index == -1) {
       _devices.add(printer);
     } else {
@@ -534,7 +659,8 @@ class OtherPrinterManager {
   }
 
   void _sortDevices() {
-    _devices.removeWhere((element) => element.name == null || element.name == '');
+    _devices
+        .removeWhere((element) => element.name == null || element.name == '');
     // remove items having same vendorId
     Set<String> seen = {};
     _devices.retainWhere((element) {
@@ -583,6 +709,34 @@ class OtherPrinterManager {
         ScanningEvent(connectionType: type, isScanning: isScanning),
       );
     }
+  }
+
+  // 性能配置方法
+  /// 配置蓝牙打印性能参数
+  void configureBluetoothPerformance(BluetoothPerformanceConfig config) {
+    _bluetoothChunkSize = config.chunkSize;
+    _bluetoothDelayMs = config.delayMs;
+    _largeDataThreshold = config.largeDataThreshold;
+    _extremeDataThreshold = config.extremeDataThreshold;
+
+    log('Bluetooth performance configured: ${config.mode.name} - '
+        'chunkSize: ${config.chunkSize}, delay: ${config.delayMs}ms');
+  }
+
+  /// 重置为默认的平衡模式配置
+  void resetBluetoothPerformanceToDefault() {
+    configureBluetoothPerformance(BluetoothPerformanceConfig.balanced);
+  }
+
+  /// 获取当前性能配置信息
+  Map<String, dynamic> getBluetoothPerformanceInfo() {
+    return {
+      'chunkSize': _bluetoothChunkSize,
+      'delayMs': _bluetoothDelayMs,
+      'largeDataThreshold': _largeDataThreshold,
+      'extremeDataThreshold': _extremeDataThreshold,
+      'smartReconnectionEnabled': true, // 始终启用
+    };
   }
 
   void dispose() {

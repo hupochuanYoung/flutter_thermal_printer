@@ -8,6 +8,7 @@ import 'package:image/image.dart' as img;
 import 'package:screenshot/screenshot.dart';
 
 import 'Others/other_printers_manager.dart';
+import 'package:flutter_thermal_printer/utils/bluetooth_performance_config.dart';
 
 export 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
 export 'package:flutter_thermal_printer/network/network_printer.dart';
@@ -83,7 +84,7 @@ class FlutterThermalPrinter {
     if (Platform.isWindows) {
       return false;
     } else {
-      return  await OtherPrinterManager.instance.disconnect(device);
+      return await OtherPrinterManager.instance.disconnect(device);
     }
   }
 
@@ -151,6 +152,55 @@ class FlutterThermalPrinter {
     }
   }
 
+  // 蓝牙性能优化配置方法
+
+  /// 配置蓝牙打印性能
+  ///
+  /// 示例用法：
+  /// ```dart
+  /// // 切换到快速模式以获得最快打印速度
+  /// FlutterThermalPrinter.instance.configureBluetoothPerformance(
+  ///   BluetoothPerformanceConfig.fast
+  /// );
+  ///
+  /// // 切换到稳定模式以提高可靠性
+  /// FlutterThermalPrinter.instance.configureBluetoothPerformance(
+  ///   BluetoothPerformanceConfig.stable
+  /// );
+  /// ```
+  void configureBluetoothPerformance(BluetoothPerformanceConfig config) {
+    if (Platform.isWindows) {
+      return; // Windows不支持蓝牙打印
+    }
+    OtherPrinterManager.instance.configureBluetoothPerformance(config);
+  }
+
+  /// 重置蓝牙性能配置为默认的平衡模式
+  void resetBluetoothPerformanceToDefault() {
+    if (Platform.isWindows) {
+      return; // Windows不支持蓝牙打印
+    }
+    OtherPrinterManager.instance.resetBluetoothPerformanceToDefault();
+  }
+
+  /// 对频繁断开的蓝牙设备使用保守配置
+  /// 建议在遇到 "read failed, socket might closed or timeout" 错误时使用
+  void useConservativeBluetoothConfig() {
+    if (Platform.isWindows) {
+      return; // Windows不支持蓝牙打印
+    }
+    OtherPrinterManager.instance
+        .configureBluetoothPerformance(BluetoothPerformanceConfig.conservative);
+  }
+
+  /// 获取当前蓝牙性能配置信息
+  Map<String, dynamic> getBluetoothPerformanceInfo() {
+    if (Platform.isWindows) {
+      return {}; // Windows不支持蓝牙打印
+    }
+    return OtherPrinterManager.instance.getBluetoothPerformanceInfo();
+  }
+
   Future<Uint8List> screenShotWidget(
     BuildContext context, {
     required Widget widget,
@@ -161,7 +211,7 @@ class FlutterThermalPrinter {
   }) async {
     final controller = ScreenshotController();
     final image = await controller.captureFromLongWidget(widget,
-        pixelRatio:1,
+        pixelRatio: 1,
         // View.of(context).devicePixelRatio,
         delay: delay);
     Generator? generator0;
@@ -239,7 +289,7 @@ class FlutterThermalPrinter {
     final image = await controller.captureFromLongWidget(
       widget,
       pixelRatio: 1,
-        // View.of(context).devicePixelRatio,
+      // View.of(context).devicePixelRatio,
       delay: delay,
     );
     if (printer.connectionType == ConnectionType.BLE) {
