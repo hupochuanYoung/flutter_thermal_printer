@@ -79,10 +79,11 @@ class FlutterThermalPrinter {
     }
   }
 
-  Future<void> disconnect(DeviceModel device) async {
+  Future<bool> disconnect(DeviceModel device) async {
     if (Platform.isWindows) {
+      return false;
     } else {
-      await OtherPrinterManager.instance.disconnect(device);
+      return  await OtherPrinterManager.instance.disconnect(device);
     }
   }
 
@@ -160,7 +161,9 @@ class FlutterThermalPrinter {
   }) async {
     final controller = ScreenshotController();
     final image = await controller.captureFromLongWidget(widget,
-        pixelRatio: View.of(context).devicePixelRatio, delay: delay);
+        pixelRatio:1,
+        // View.of(context).devicePixelRatio,
+        delay: delay);
     Generator? generator0;
     if (generator == null) {
       final profile = await CapabilityProfile.load();
@@ -235,7 +238,8 @@ class FlutterThermalPrinter {
 
     final image = await controller.captureFromLongWidget(
       widget,
-      pixelRatio: View.of(context).devicePixelRatio,
+      pixelRatio: 1,
+        // View.of(context).devicePixelRatio,
       delay: delay,
     );
     if (printer.connectionType == ConnectionType.BLE) {
