@@ -194,7 +194,7 @@ class OtherPrinterManager {
       try {
         final bt = _activeBluetoothConnections[device.address!];
         if (bt == null) return false;
-        await bt.close();
+        bt.dispose();
         _activeBluetoothConnections.remove(device.address!);
         return true;
       } catch (e) {
