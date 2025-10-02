@@ -193,6 +193,23 @@ class FlutterThermalPrinter {
         .configureBluetoothPerformance(BluetoothPerformanceConfig.conservative);
   }
 
+  /// 重置特定设备的超时失败计数
+  /// 当设备修复或重新连接后，可以调用此方法重置失败统计
+  void resetDeviceTimeoutFailures(String deviceAddress) {
+    if (Platform.isWindows) {
+      return; // Windows不支持蓝牙打印
+    }
+    OtherPrinterManager.instance.resetDeviceTimeoutFailures(deviceAddress);
+  }
+
+  /// 重置所有设备的超时失败计数
+  void resetAllTimeoutFailures() {
+    if (Platform.isWindows) {
+      return; // Windows不支持蓝牙打印
+    }
+    OtherPrinterManager.instance.resetAllTimeoutFailures();
+  }
+
   /// 获取当前蓝牙性能配置信息
   Map<String, dynamic> getBluetoothPerformanceInfo() {
     if (Platform.isWindows) {

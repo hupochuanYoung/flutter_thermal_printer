@@ -58,6 +58,8 @@ class OtherPrinterManager {
   final Map<String, DateTime> _lastConnectionCheck = {};
   final Map<String, int> _connectionFailureCount =
       {}; // Track connection failures per device
+  final Map<String, int> _timeoutFailureCount =
+      {}; // Track timeout failures per device
   final int _port = 9100;
 
   static const String _deviceChannelName =
@@ -342,10 +344,20 @@ class OtherPrinterManager {
           _lastConnectionCheck[device.address!] = DateTime.now();
         }
 
+        // 检查设备是否有超时历史，如果是则使用保守配置
+        final deviceAddress = device.address!;
+        final timeoutCount = _timeoutFailureCount[deviceAddress] ?? 0;
+        if (timeoutCount >= 2) {
+          log('Device $deviceAddress has $timeoutCount timeout failures, using conservative configuration');
+          // 临时切换到保守配置
+          configureBluetoothPerformance(
+              BluetoothPerformanceConfig.conservative);
+        }
+
         // 优化的蓝牙发送策略：使用可配置的阈值
         if (longData || bytes.length > _largeDataThreshold) {
           log('Sending large data (${bytes.length} bytes) in chunks');
-          await _sendDataInChunksOptimized(bt, bytes);
+          await _sendDataInChunksWithDeviceContext(bt, bytes, deviceAddress);
         } else {
           log('Sending data (${bytes.length} bytes)');
           bt.output.add(Uint8List.fromList(bytes));
@@ -359,31 +371,129 @@ class OtherPrinterManager {
   }
 
   // 优化的分片发送策略：使用可配置的参数
+  // 带设备上下文的分片发送方法，记录失败次数
+  Future<void> _sendDataInChunksWithDeviceContext(
+      BluetoothConnection bt, List<int> bytes, String deviceAddress) async {
+    try {
+      await _sendDataInChunksOptimized(bt, bytes);
+      // 成功发送，重置超时失败计数
+      if (_timeoutFailureCount[deviceAddress] != null) {
+        _timeoutFailureCount[deviceAddress] = 0;
+        log('Reset timeout failure count for device $deviceAddress');
+      }
+    } catch (e) {
+      // 如果是超时错误，增加失败计数
+      if (e.toString().contains('TimeoutException') ||
+          e.toString().contains('Future not completed')) {
+        _timeoutFailureCount[deviceAddress] =
+            (_timeoutFailureCount[deviceAddress] ?? 0) + 1;
+        log('Incremented timeout failure count for device $deviceAddress: ${_timeoutFailureCount[deviceAddress]}');
+      }
+      rethrow;
+    }
+  }
+
   Future<void> _sendDataInChunksOptimized(
       BluetoothConnection bt, List<int> bytes) async {
+    const int maxRetryAttempts = 2;
+    const int chunkTimeoutSeconds = 8; // 增加分片超时时间
+
+    final int totalChunks = (bytes.length / _bluetoothChunkSize).ceil();
+    log('Starting chunked send: ${bytes.length} bytes in $totalChunks chunks');
+
     for (int i = 0; i < bytes.length; i += _bluetoothChunkSize) {
       int end = (i + _bluetoothChunkSize < bytes.length)
           ? i + _bluetoothChunkSize
           : bytes.length;
       List<int> chunk = bytes.sublist(i, end);
+      final int chunkNumber = (i ~/ _bluetoothChunkSize) + 1;
 
-      log('Sending chunk ${(i ~/ _bluetoothChunkSize) + 1}/'
-          '${(bytes.length / _bluetoothChunkSize).ceil()} '
-          '(${chunk.length} bytes)');
+      log('Sending chunk $chunkNumber/$totalChunks (${chunk.length} bytes)');
 
-      try {
-        bt.output.add(Uint8List.fromList(chunk));
-        await bt.output.allSent
-            .timeout(Duration(seconds: 5)); // Add timeout per chunk
+      bool chunkSent = false;
+      Exception? lastError;
 
-        // 只在极端大数据时添加延迟
-        if (end < bytes.length && bytes.length > _extremeDataThreshold) {
-          await Future.delayed(Duration(milliseconds: _bluetoothDelayMs));
+      // 尝试发送分片，最多重试maxRetryAttempts次
+      for (int attempt = 1;
+          attempt <= maxRetryAttempts && !chunkSent;
+          attempt++) {
+        try {
+          bt.output.add(Uint8List.fromList(chunk));
+          await bt.output.allSent
+              .timeout(Duration(seconds: chunkTimeoutSeconds));
+
+          log('Chunk $chunkNumber/$totalChunks sent successfully');
+          chunkSent = true;
+
+          // 只在极端大数据时添加延迟
+          if (end < bytes.length && bytes.length > _extremeDataThreshold) {
+            await Future.delayed(Duration(milliseconds: _bluetoothDelayMs));
+          }
+
+          // 等待一小段时间让打印机处理数据
+          if (bytes.length > 4096 && chunkNumber % 10 == 0) {
+            await Future.delayed(Duration(milliseconds: 10));
+          }
+        } catch (e) {
+          lastError = e is Exception ? e : Exception(e.toString());
+          log('Chunk $chunkNumber/$totalChunks attempt $attempt failed: $e');
+
+          // Check if it's a timeout error
+          if (e.toString().contains('TimeoutException') ||
+              e.toString().contains('Future not completed')) {
+            log('Detected timeout error on chunk $chunkNumber');
+          }
+
+          if (attempt < maxRetryAttempts) {
+            // 等待一段时间再重试，超时错误等待更长时间
+            final delayMs = e.toString().contains('TimeoutException')
+                ? 1000 * attempt
+                : 200 * attempt;
+            await Future.delayed(Duration(milliseconds: delayMs));
+            log('Retrying chunk $chunkNumber/$totalChunks after ${delayMs}ms...');
+          }
         }
-      } catch (e) {
-        log('Failed to send chunk ${(i ~/ _bluetoothChunkSize) + 1}: $e');
-        rethrow; // Let the calling method handle the error
       }
+
+      // 如果分片发送失败，尝试恢复策略
+      if (!chunkSent) {
+        await _handleFailedChunk(bt, chunkNumber, totalChunks, lastError);
+      }
+    }
+
+    log('Chunked send completed: ${bytes.length} bytes');
+  }
+
+  // 处理失败的分片
+  Future<void> _handleFailedChunk(BluetoothConnection bt, int chunkNumber,
+      int totalChunks, Exception? error) async {
+    log('Handling failed chunk $chunkNumber/$totalChunks');
+
+    try {
+      // 记录超时失败次数（如果有地址信息的话）
+      if (error.toString().contains('TimeoutException')) {
+        // 尝试从蓝牙连接获取地址，这里需要传入设备地址
+        log('Timeout failure detected on chunk $chunkNumber');
+      }
+
+      // 尝试检查连接状态
+      if (!bt.isConnected) {
+        log('Connection lost during chunked send, cannot recover');
+        throw Exception('Bluetooth connection lost during chunk sending');
+      }
+
+      // 对于超时错误，等待更长时间让打印机处理缓冲区
+      if (error?.toString().contains('TimeoutException') == true) {
+        await Future.delayed(Duration(milliseconds: 1500));
+        log('Extended wait for timeout recovery');
+      } else {
+        await Future.delayed(Duration(milliseconds: 500));
+      }
+
+      log('Continuing with next chunk despite failure');
+    } catch (e) {
+      log('Failed to handle chunk failure: $e');
+      rethrow;
     }
   }
 
@@ -736,7 +846,21 @@ class OtherPrinterManager {
       'largeDataThreshold': _largeDataThreshold,
       'extremeDataThreshold': _extremeDataThreshold,
       'smartReconnectionEnabled': true, // 始终启用
+      'timeoutFailureCounts': Map.from(_timeoutFailureCount),
+      'connectionFailureCounts': Map.from(_connectionFailureCount),
     };
+  }
+
+  /// 重置特定设备的超时失败计数
+  void resetDeviceTimeoutFailures(String deviceAddress) {
+    _timeoutFailureCount.remove(deviceAddress);
+    log('Reset timeout failure count for device $deviceAddress');
+  }
+
+  /// 重置所有设备的超时失败计数
+  void resetAllTimeoutFailures() {
+    _timeoutFailureCount.clear();
+    log('Reset all timeout failure counts');
   }
 
   void dispose() {

@@ -7,8 +7,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_thermal_printer/flutter_thermal_printer.dart';
 import 'package:flutter_thermal_printer/utils/printer.dart';
+import 'package:permission_handler/permission_handler.dart';
 
-void main() {
+Future<void> ensureBluetoothPermissions() async {
+  if (await Permission.bluetoothScan.isDenied || await Permission.bluetoothConnect.isDenied) {
+    await [
+      Permission.bluetoothScan,
+      Permission.bluetoothConnect,
+      Permission.location, // needed for discovery on older Android
+    ].request();
+  }
+}
+Future<void> main() async {
   runApp(const MyApp());
 }
 
@@ -50,7 +60,8 @@ class _MyAppState extends State<MyApp> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((timeStamp) {
+    WidgetsBinding.instance.addPostFrameCallback((timeStamp) async {
+      await ensureBluetoothPermissions();
       startScan();
     });
   }
