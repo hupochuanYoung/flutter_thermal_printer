@@ -10,7 +10,7 @@ class ScanningEvent {
   String toString() => 'ScanningEvent($connectionType: $isScanning)';
 }
 
-enum BluetoothDeviceType { classic, dual, unknown }
+enum BleDeviceType { classic, dual, unknown }
 
 class DeviceModel {
   String? address;
@@ -21,7 +21,7 @@ class DeviceModel {
   String? productId;
   int? rssi;
   bool? isRemove;
-  BluetoothDeviceType? bluetoothDeviceType;
+  BleDeviceType? bleDeviceType;
 
   DeviceModel({
     this.address,
@@ -32,7 +32,7 @@ class DeviceModel {
     this.productId,
     this.rssi,
     this.isRemove,
-    this.bluetoothDeviceType,
+    this.bleDeviceType,
   });
 
   DeviceModel.fromJson(Map<String, dynamic> json) {
@@ -45,7 +45,7 @@ class DeviceModel {
     productId = json['productId'];
     rssi = json['rssi'];
     isRemove = json['isRemove'];
-    bluetoothDeviceType = json['bluetoothDeviceType'];
+    bleDeviceType = json['bleDeviceType'];
   }
 
   Map<String, dynamic> toJson() {
@@ -62,7 +62,7 @@ class DeviceModel {
     data['rssi'] = rssi;
     data['productId'] = productId;
     data['isRemove'] = isRemove;
-    data['bluetoothDeviceType'] = bluetoothDeviceType;
+    data['bleDeviceType'] = bleDeviceType;
     return data;
   }
 

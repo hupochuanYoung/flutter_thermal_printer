@@ -8,9 +8,7 @@ import 'package:flutter_blue_classic/flutter_blue_classic.dart';
 import 'package:network_info_plus/network_info_plus.dart';
 import 'package:flutter_thermal_printer/flutter_thermal_printer_platform_interface.dart';
 import 'package:flutter_thermal_printer/utils/printer.dart';
-import 'package:flutter_blue_classic/src/model/bluetooth_device.dart'
-    as flutter_blue_classic_model;
-import 'package:flutter_thermal_printer/utils/printer.dart' as printer_model;
+import 'package:flutter_blue_classic/src/model/bluetooth_device.dart' as flutter_blue_classic_model;
 
 class OtherPrinterManager {
   OtherPrinterManager._privateConstructor();
@@ -22,12 +20,9 @@ class OtherPrinterManager {
     return _instance!;
   }
 
-  final StreamController<List<DeviceModel>> _devicesstream =
-      StreamController<List<DeviceModel>>.broadcast();
-  final StreamController<Map<String, dynamic>> _callerIdStream =
-      StreamController<Map<String, dynamic>>.broadcast();
-  final StreamController<ScanningEvent> _scanningStream =
-      StreamController<ScanningEvent>.broadcast();
+  final StreamController<List<DeviceModel>> _devicesstream = StreamController<List<DeviceModel>>.broadcast();
+  final StreamController<Map<String, dynamic>> _callerIdStream = StreamController<Map<String, dynamic>>.broadcast();
+  final StreamController<ScanningEvent> _scanningStream = StreamController<ScanningEvent>.broadcast();
 
   Stream<List<DeviceModel>> get devicesStream => _devicesstream.stream;
 
@@ -47,10 +42,8 @@ class OtherPrinterManager {
   final Map<String, BluetoothConnection> _activeBluetoothConnections = {};
   final int _port = 9100;
 
-  static const String _deviceChannelName =
-      'flutter_thermal_printer/device_events';
-  static const String _callerIdChannelName =
-      'flutter_thermal_printer/callerid_events';
+  static const String _deviceChannelName = 'flutter_thermal_printer/device_events';
+  static const String _callerIdChannelName = 'flutter_thermal_printer/callerid_events';
 
   final EventChannel _deviceEventChannel = EventChannel(_deviceChannelName);
   final EventChannel _callerIdEventChannel = EventChannel(_callerIdChannelName);
@@ -75,8 +68,7 @@ class OtherPrinterManager {
 
   Future<bool> startListening(DeviceModel device) async {
     _callerIdSubscription?.cancel();
-    _callerIdSubscription =
-        _callerIdEventChannel.receiveBroadcastStream().listen((event) {
+    _callerIdSubscription = _callerIdEventChannel.receiveBroadcastStream().listen((event) {
       final map = Map<String, dynamic>.from(event);
       log("Received Caller ID: ${map['caller']} at ${map['datetime']}");
       _callerIdStream.add(map);
@@ -263,8 +255,7 @@ class OtherPrinterManager {
   }
 
   // 分片发送数据到蓝牙设备
-  Future<void> _sendDataInChunks(
-      BluetoothConnection bt, List<int> bytes) async {
+  Future<void> _sendDataInChunks(BluetoothConnection bt, List<int> bytes) async {
     const int chunkSize = 1024; // 每片1024字节，平衡速度和稳定性
     const int delayMs = 5; // 减少延迟到5ms，提高流畅性
 
@@ -319,8 +310,7 @@ class OtherPrinterManager {
 
   Future<void> _getUSBDevices() async {
     try {
-      final devices =
-          await FlutterThermalPrinterPlatform.instance.startUsbScan();
+      final devices = await FlutterThermalPrinterPlatform.instance.startUsbScan();
 
       List<DeviceModel> usbPrinters = [];
       for (var map in devices) {
@@ -332,15 +322,13 @@ class OtherPrinterManager {
           address: map['vendorId'].toString(),
           isConnected: map['connected'] ?? false,
         );
-        printer.isConnected =
-            await FlutterThermalPrinterPlatform.instance.isConnected(printer);
+        printer.isConnected = await FlutterThermalPrinterPlatform.instance.isConnected(printer);
         usbPrinters.add(printer);
       }
 
       _devices.addAll(usbPrinters);
       _usbSubscription?.cancel();
-      _usbSubscription =
-          _deviceEventChannel.receiveBroadcastStream().listen((event) {
+      _usbSubscription = _deviceEventChannel.receiveBroadcastStream().listen((event) {
         final map = Map<String, dynamic>.from(event);
         _updateOrAddPrinter(DeviceModel(
           vendorId: map['vendorId'].toString(),
@@ -393,16 +381,12 @@ class OtherPrinterManager {
           name: bluetoothDevice.name,
           connectionType: ConnectionType.BLE,
           rssi: bluetoothDevice.rssi,
-          isConnected:
-              _activeBluetoothConnections.containsKey(bluetoothDevice.address),
-          bluetoothDeviceType:
-              flutter_blue_classic_model.BluetoothDeviceType.classic ==
-                      flutter_blue_classic_model.BluetoothDeviceType.classic
-                  ? printer_model.BluetoothDeviceType.classic
-                  : flutter_blue_classic_model.BluetoothDeviceType.dual ==
-                          flutter_blue_classic_model.BluetoothDeviceType.dual
-                      ? printer_model.BluetoothDeviceType.dual
-                      : printer_model.BluetoothDeviceType.unknown,
+          isConnected: _activeBluetoothConnections.containsKey(bluetoothDevice.address),
+          bleDeviceType: flutter_blue_classic_model.BluetoothDeviceType.classic == bluetoothDevice.type
+              ? BleDeviceType.classic
+              : flutter_blue_classic_model.BluetoothDeviceType.dual == bluetoothDevice.type
+                  ? BleDeviceType.dual
+                  : BleDeviceType.unknown,
         );
         _updateOrAddPrinter(printer);
       });
@@ -422,6 +406,11 @@ class OtherPrinterManager {
         rssi: device.rssi,
         connectionType: ConnectionType.BLE,
         isConnected: _activeBluetoothConnections.containsKey(device.address),
+        bleDeviceType: flutter_blue_classic_model.BluetoothDeviceType.classic == device.type
+            ? BleDeviceType.classic
+            : flutter_blue_classic_model.BluetoothDeviceType.dual == device.type
+                ? BleDeviceType.dual
+                : BleDeviceType.unknown,
       ));
     }
 
@@ -454,9 +443,7 @@ class OtherPrinterManager {
           allBatches.clear();
 
           // Check if we found enough devices
-          final foundDevices = _devices
-              .where((d) => d.connectionType == ConnectionType.NETWORK)
-              .length;
+          final foundDevices = _devices.where((d) => d.connectionType == ConnectionType.NETWORK).length;
           if (foundDevices >= cloudPrinterNum) {
             break;
           }
@@ -503,9 +490,7 @@ class OtherPrinterManager {
           _devices.add(device);
 
           // Check if we've reached the limit
-          final networkDeviceCount = _devices
-              .where((d) => d.connectionType == ConnectionType.NETWORK)
-              .length;
+          final networkDeviceCount = _devices.where((d) => d.connectionType == ConnectionType.NETWORK).length;
           if (networkDeviceCount >= maxDevices) {
             _updateScanningState(ConnectionType.NETWORK, false);
             break;
@@ -551,8 +536,7 @@ class OtherPrinterManager {
   }
 
   void _updateOrAddPrinter(DeviceModel printer) {
-    final index =
-        _devices.indexWhere((device) => device.address == printer.address);
+    final index = _devices.indexWhere((device) => device.address == printer.address);
     if (index == -1) {
       _devices.add(printer);
     } else {
@@ -562,8 +546,7 @@ class OtherPrinterManager {
   }
 
   void _sortDevices() {
-    _devices
-        .removeWhere((element) => element.name == null || element.name == '');
+    _devices.removeWhere((element) => element.name == null || element.name == '');
     // remove items having same vendorId
     Set<String> seen = {};
     _devices.retainWhere((element) {
