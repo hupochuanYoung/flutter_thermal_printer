@@ -195,8 +195,11 @@ class _MyAppState extends State<MyApp> {
                     return ListTile(
                       onTap: () async {
                         if (printers[index].isConnected ?? false) {
-                          await _flutterThermalPrinterPlugin
+                         bool res=  await _flutterThermalPrinterPlugin
                               .disconnect(printers[index]);
+                         setState(() {
+                           printers[index].isConnected = res;
+                         });
                         } else {
                           bool res = await _flutterThermalPrinterPlugin
                               .connect(printers[index]);

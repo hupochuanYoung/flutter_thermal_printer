@@ -8,6 +8,9 @@ import 'package:flutter_blue_classic/flutter_blue_classic.dart';
 import 'package:network_info_plus/network_info_plus.dart';
 import 'package:flutter_thermal_printer/flutter_thermal_printer_platform_interface.dart';
 import 'package:flutter_thermal_printer/utils/printer.dart';
+import 'package:flutter_blue_classic/src/model/bluetooth_device.dart'
+    as flutter_blue_classic_model;
+import 'package:flutter_thermal_printer/utils/printer.dart' as printer_model;
 
 class OtherPrinterManager {
   OtherPrinterManager._privateConstructor();
@@ -122,10 +125,10 @@ class OtherPrinterManager {
     } else {
       try {
         // bondDevice if not bonded
-        bool isBonded = await bondDevice(device.address!);
-        if (!isBonded) {
-          return false;
-        }
+        // bool isBonded = await bondDevice(device.address!);
+        // if (!isBonded) {
+        //   return false;
+        // }
         return await bluetoothConnect(device.address!);
       } catch (e) {
         debugPrint('connect $e');
@@ -154,13 +157,12 @@ class OtherPrinterManager {
       // Clean up any existing connection first
       if (_activeBluetoothConnections.containsKey(address)) {
         try {
-          await _activeBluetoothConnections[address]?.close();
+          _activeBluetoothConnections[address]?.dispose();
         } catch (e) {
           debugPrint('Failed to close existing connection: $e');
         }
         _activeBluetoothConnections.remove(address);
       }
-
       // 建立连接，增加超时时间
       BluetoothConnection? bt = await blueClassic.connect(address);
       if (bt == null) return false;
@@ -393,6 +395,14 @@ class OtherPrinterManager {
           rssi: bluetoothDevice.rssi,
           isConnected:
               _activeBluetoothConnections.containsKey(bluetoothDevice.address),
+          bluetoothDeviceType:
+              flutter_blue_classic_model.BluetoothDeviceType.classic ==
+                      flutter_blue_classic_model.BluetoothDeviceType.classic
+                  ? printer_model.BluetoothDeviceType.classic
+                  : flutter_blue_classic_model.BluetoothDeviceType.dual ==
+                          flutter_blue_classic_model.BluetoothDeviceType.dual
+                      ? printer_model.BluetoothDeviceType.dual
+                      : printer_model.BluetoothDeviceType.unknown,
         );
         _updateOrAddPrinter(printer);
       });
@@ -611,5 +621,15 @@ class OtherPrinterManager {
     _bleSubscription?.cancel();
     _usbSubscription?.cancel();
     _callerIdSubscription?.cancel();
+
+    // Clean up active Bluetooth connections
+    for (var connection in _activeBluetoothConnections.values) {
+      try {
+        connection.dispose();
+      } catch (e) {
+        debugPrint('Error disposing Bluetooth connection: $e');
+      }
+    }
+    _activeBluetoothConnections.clear();
   }
 }
