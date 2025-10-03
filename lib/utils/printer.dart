@@ -21,7 +21,7 @@ class DeviceModel {
   String? productId;
   int? rssi;
   bool? isRemove;
-  BleDeviceType? bleDeviceType;
+  String? bleDeviceType;
 
   DeviceModel({
     this.address,

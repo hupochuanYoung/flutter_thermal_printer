@@ -382,11 +382,7 @@ class OtherPrinterManager {
           connectionType: ConnectionType.BLE,
           rssi: bluetoothDevice.rssi,
           isConnected: _activeBluetoothConnections.containsKey(bluetoothDevice.address),
-          bleDeviceType: flutter_blue_classic_model.BluetoothDeviceType.classic == bluetoothDevice.type
-              ? BleDeviceType.classic
-              : flutter_blue_classic_model.BluetoothDeviceType.dual == bluetoothDevice.type
-                  ? BleDeviceType.dual
-                  : BleDeviceType.unknown,
+          bleDeviceType: bluetoothDevice.type.name,
         );
         _updateOrAddPrinter(printer);
       });
@@ -406,11 +402,7 @@ class OtherPrinterManager {
         rssi: device.rssi,
         connectionType: ConnectionType.BLE,
         isConnected: _activeBluetoothConnections.containsKey(device.address),
-        bleDeviceType: flutter_blue_classic_model.BluetoothDeviceType.classic == device.type
-            ? BleDeviceType.classic
-            : flutter_blue_classic_model.BluetoothDeviceType.dual == device.type
-                ? BleDeviceType.dual
-                : BleDeviceType.unknown,
+        bleDeviceType: device.type.name,
       ));
     }
 
