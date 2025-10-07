@@ -461,7 +461,7 @@ class OtherPrinterManager {
       });
 
       _bleScanTimeout?.cancel();
-      _bleScanTimeout = Timer(const Duration(seconds: 10), () async {
+      _bleScanTimeout = Timer(const Duration(seconds: 20), () async {
         await stopScan(stopUsb: false, stopBle: true, stopNetwork: false);
       });
     } catch (e) {
