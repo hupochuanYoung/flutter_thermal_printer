@@ -35,6 +35,7 @@ class _MyAppState extends State<MyApp> {
     await _flutterThermalPrinterPlugin.getDevices(connectionTypes: [
       ConnectionType.USB,
       ConnectionType.BLE,
+      ConnectionType.NETWORK,
     ]);
     _devicesStreamSubscription = _flutterThermalPrinterPlugin.devicesStream
         .listen((List<DeviceModel> event) {
@@ -197,9 +198,12 @@ class _MyAppState extends State<MyApp> {
                         if (printers[index].isConnected ?? false) {
                          bool res=  await _flutterThermalPrinterPlugin
                               .disconnect(printers[index]);
-                         setState(() {
-                           printers[index].isConnected = res;
-                         });
+                         if(res){
+                           setState(() {
+                             printers[index].isConnected = false;
+                           });
+                         }
+
                         } else {
                           bool res = await _flutterThermalPrinterPlugin
                               .connect(printers[index]);
@@ -210,7 +214,7 @@ class _MyAppState extends State<MyApp> {
                       },
                       title: Text(printers[index].name ?? 'No Name'),
                       subtitle:
-                          Text("Connected: ${printers[index].isConnected}"),
+                          Text("Connected: ${printers[index].isConnected} -- ${printers[index].connectionType}"),
                       trailing: IconButton(
                         icon: const Icon(Icons.connect_without_contact),
                         onPressed: () async {
