@@ -459,10 +459,8 @@ class OtherPrinterManager {
       });
 
       _bleScanTimeout?.cancel();
-      _bleScanTimeout = Timer(const Duration(seconds: 10), () {
-        blueClassic.stopScan();
-        debugPrint('BLE scan timeout');
-        _updateScanningState(ConnectionType.BLE, false);
+      _bleScanTimeout = Timer(const Duration(seconds: 10), () async {
+        await stopScan(stopUsb: false, stopBle: true, stopNetwork: false);
       });
     } catch (e) {
       _updateScanningState(ConnectionType.BLE, false);
