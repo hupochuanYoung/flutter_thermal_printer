@@ -321,6 +321,7 @@ class OtherPrinterManager {
           connectionType: ConnectionType.USB,
           address: map['vendorId'].toString(),
           isConnected: map['connected'] ?? false,
+          isRemove: map['isRemove'] ?? false,
         );
         printer.isConnected = await FlutterThermalPrinterPlatform.instance.isConnected(printer);
         usbPrinters.add(printer);
@@ -337,6 +338,7 @@ class OtherPrinterManager {
           connectionType: ConnectionType.USB,
           address: map['vendorId'].toString(),
           isConnected: map['connected'] ?? false,
+          isRemove: map['isRemove'] ?? false,
         ));
       });
 
