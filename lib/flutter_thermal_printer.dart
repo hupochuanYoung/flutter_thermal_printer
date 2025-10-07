@@ -108,7 +108,7 @@ class FlutterThermalPrinter {
   Future<void> getDevices({
     List<ConnectionType> connectionTypes = const [ConnectionType.USB],
     bool androidUsesFineLocation = false,
-    int cloudPrinterNum = 1,
+    int cloudPrinterNum = 10,
   }) async {
     if (Platform.isWindows) {
     } else {
