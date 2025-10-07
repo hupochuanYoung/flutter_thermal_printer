@@ -7,6 +7,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_thermal_printer/flutter_thermal_printer.dart';
 import 'package:flutter_thermal_printer/utils/printer.dart';
+import 'error_dialog_example.dart';
 
 void main() {
   runApp(const MyApp());
@@ -20,6 +21,37 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
+  @override
+  void initState() {
+    super.initState();
+    // Initialize error dialog manager
+    FlutterThermalPrinter.instance.initializeErrorDialog();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: _MyHomePage(
+        onErrorDialogContextSet: (context) {
+          // Set BuildContext for error dialogs
+          FlutterThermalPrinter.instance.setErrorDialogContext(context);
+        },
+      ),
+    );
+  }
+}
+
+class _MyHomePage extends StatefulWidget {
+  final Function(BuildContext) onErrorDialogContextSet;
+
+  const _MyHomePage({required this.onErrorDialogContextSet});
+
+  @override
+  State<_MyHomePage> createState() => _MyHomePageState();
+}
+
+class _MyHomePageState extends State<_MyHomePage> {
   final _flutterThermalPrinterPlugin = FlutterThermalPrinter.instance;
 
   String _ip = '192.168.0.100';
@@ -61,175 +93,187 @@ class _MyAppState extends State<MyApp> {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      home: Scaffold(
-        appBar: AppBar(
-          title: const Text('Plugin example app'),
-          systemOverlayStyle: const SystemUiOverlayStyle(
-            statusBarColor: Colors.transparent,
-          ),
+    // Set BuildContext for error dialogs
+    widget.onErrorDialogContextSet(context);
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Plugin example app'),
+        systemOverlayStyle: const SystemUiOverlayStyle(
+          statusBarColor: Colors.transparent,
         ),
-        body: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Text(
-                'NETWORK',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                initialValue: _ip,
-                decoration: const InputDecoration(
-                  labelText: 'Enter IP Address',
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.error_outline),
+            onPressed: () {
+              Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (context) => const ErrorDialogExample(),
                 ),
-                onChanged: (value) {
-                  _ip = value;
-                },
+              );
+            },
+            tooltip: 'Error Dialog Example',
+          ),
+        ],
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              'NETWORK',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              initialValue: _ip,
+              decoration: const InputDecoration(
+                labelText: 'Enter IP Address',
               ),
-              const SizedBox(height: 12),
-              TextFormField(
-                initialValue: _port,
-                decoration: const InputDecoration(
-                  labelText: 'Enter Port',
-                ),
-                onChanged: (value) {
-                  _port = value;
-                },
+              onChanged: (value) {
+                _ip = value;
+              },
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              initialValue: _port,
+              decoration: const InputDecoration(
+                labelText: 'Enter Port',
               ),
-              const SizedBox(height: 12),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () async {
-                        final service = FlutterThermalPrinterNetwork(
-                          _ip,
-                          port: int.parse(_port),
+              onChanged: (value) {
+                _port = value;
+              },
+            ),
+            const SizedBox(height: 12),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      final service = FlutterThermalPrinterNetwork(
+                        _ip,
+                        port: int.parse(_port),
+                      );
+                      await service.connect();
+                      final profile = await CapabilityProfile.load();
+                      final generator = Generator(PaperSize.mm80, profile);
+                      List<int> bytes = [];
+                      if (context.mounted) {
+                        bytes = await FlutterThermalPrinter.instance
+                            .screenShotWidget(
+                          context,
+                          generator: generator,
+                          widget: receiptWidget("Network"),
                         );
-                        await service.connect();
-                        final profile = await CapabilityProfile.load();
-                        final generator = Generator(PaperSize.mm80, profile);
-                        List<int> bytes = [];
-                        if (context.mounted) {
-                          bytes = await FlutterThermalPrinter.instance
-                              .screenShotWidget(
-                            context,
-                            generator: generator,
-                            widget: receiptWidget("Network"),
-                          );
-                          bytes += generator.cut();
-                          await service.printTicket(bytes);
-                        }
-                        await service.disconnect();
-                      },
-                      child: const Text('Test network printer'),
-                    ),
-                  ),
-                  const SizedBox(width: 22),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () async {
-                        final service = FlutterThermalPrinterNetwork(_ip,
-                            port: int.parse(_port));
-                        await service.connect();
-                        final bytes = await _generateReceipt();
+                        bytes += generator.cut();
                         await service.printTicket(bytes);
-                        await service.disconnect();
-                      },
-                      child: const Text('Test network printer widget'),
-                    ),
+                      }
+                      await service.disconnect();
+                    },
+                    child: const Text('Test network printer'),
                   ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              const Divider(),
-              const SizedBox(height: 22),
-              Text(
-                'USB/BLE',
-                style: Theme.of(context).textTheme.titleLarge,
-              ),
-              const SizedBox(height: 22),
-              Row(
-                children: [
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () {
-                        // startScan();
-                        startScan();
-                      },
-                      child: const Text('Get Printers'),
-                    ),
+                ),
+                const SizedBox(width: 22),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      final service = FlutterThermalPrinterNetwork(_ip,
+                          port: int.parse(_port));
+                      await service.connect();
+                      final bytes = await _generateReceipt();
+                      await service.printTicket(bytes);
+                      await service.disconnect();
+                    },
+                    child: const Text('Test network printer widget'),
                   ),
-                  const SizedBox(width: 22),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () {
-                        stopScan();
-                      },
-                      child: const Text('Stop Scan'),
-                    ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            const Divider(),
+            const SizedBox(height: 22),
+            Text(
+              'USB/BLE',
+              style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 22),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () {
+                      // startScan();
+                      startScan();
+                    },
+                    child: const Text('Get Printers'),
                   ),
-                  Expanded(
-                    child: ElevatedButton(
+                ),
+                const SizedBox(width: 22),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () {
+                      stopScan();
+                    },
+                    child: const Text('Stop Scan'),
+                  ),
+                ),
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      await _flutterThermalPrinterPlugin.printWidget(
+                        context,
+                        printer: printers[1],
+                        widget: receiptWidget(printers[1].connectionTypeString),
+                      );
+                    },
+                    child: const Text('Print receipt'),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            Expanded(
+              child: ListView.builder(
+                itemCount: printers.length,
+                itemBuilder: (context, index) {
+                  return ListTile(
+                    onTap: () async {
+                      if (printers[index].isConnected ?? false) {
+                        bool res = await _flutterThermalPrinterPlugin
+                            .disconnect(printers[index]);
+                        setState(() {
+                          printers[index].isConnected = res;
+                        });
+                      } else {
+                        bool res = await _flutterThermalPrinterPlugin
+                            .connect(printers[index]);
+                        setState(() {
+                          printers[index].isConnected = res;
+                        });
+                      }
+                    },
+                    title: Text(printers[index].name ?? 'No Name'),
+                    subtitle: Text("Connected: ${printers[index].isConnected}"),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.connect_without_contact),
                       onPressed: () async {
                         await _flutterThermalPrinterPlugin.printWidget(
                           context,
-                          printer: printers[1],
-                          widget:
-                              receiptWidget(printers[1].connectionTypeString),
+                          printer: printers[index],
+                          printOnBle: true,
+                          widget: receiptWidget(
+                            printers[index].connectionTypeString,
+                          ),
                         );
                       },
-                      child: const Text('Print receipt'),
                     ),
-                  ),
-                ],
+                  );
+                },
               ),
-              const SizedBox(height: 12),
-              Expanded(
-                child: ListView.builder(
-                  itemCount: printers.length,
-                  itemBuilder: (context, index) {
-                    return ListTile(
-                      onTap: () async {
-                        if (printers[index].isConnected ?? false) {
-                         bool res=  await _flutterThermalPrinterPlugin
-                              .disconnect(printers[index]);
-                         setState(() {
-                           printers[index].isConnected = res;
-                         });
-                        } else {
-                          bool res = await _flutterThermalPrinterPlugin
-                              .connect(printers[index]);
-                          setState(() {
-                            printers[index].isConnected = res;
-                          });
-                        }
-                      },
-                      title: Text(printers[index].name ?? 'No Name'),
-                      subtitle:
-                          Text("Connected: ${printers[index].isConnected}"),
-                      trailing: IconButton(
-                        icon: const Icon(Icons.connect_without_contact),
-                        onPressed: () async {
-                          await _flutterThermalPrinterPlugin.printWidget(
-                            context,
-                            printer: printers[index],
-                            printOnBle: true,
-                            widget: receiptWidget(
-                              printers[index].connectionTypeString,
-                            ),
-                          );
-                        },
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );

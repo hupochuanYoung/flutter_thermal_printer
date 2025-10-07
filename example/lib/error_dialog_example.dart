@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_thermal_printer/flutter_thermal_printer.dart';
 import 'package:flutter_thermal_printer/utils/printer.dart';
+import 'package:flutter_thermal_printer/utils/error_dialog_manager.dart';
 
-/// 错误弹窗功能使用示例
+/// Error Dialog Feature Usage Example
 class ErrorDialogExample extends StatefulWidget {
   const ErrorDialogExample({super.key});
 
@@ -14,9 +15,9 @@ class _ErrorDialogExampleState extends State<ErrorDialogExample> {
   @override
   void initState() {
     super.initState();
-    // 初始化错误弹窗管理器
+    // Initialize error dialog manager
     FlutterThermalPrinter.instance.initializeErrorDialog();
-    // 设置用于显示错误弹窗的BuildContext
+    // Set BuildContext for displaying error dialogs
     FlutterThermalPrinter.instance.setErrorDialogContext(context);
   }
 
@@ -25,8 +26,10 @@ class _ErrorDialogExampleState extends State<ErrorDialogExample> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Error Dialog Example'),
+        backgroundColor: Colors.blue,
+        foregroundColor: Colors.white,
       ),
-      body: Padding(
+      body: SingleChildScrollView(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -90,6 +93,19 @@ class _ErrorDialogExampleState extends State<ErrorDialogExample> {
               onPressed: () => _testRealConnection(),
               child: const Text(
                   'Test Real Connection (Will Trigger Error Dialog)'),
+            ),
+            const SizedBox(height: 20),
+
+            // Error notification example
+            const Text(
+              'Error Notification Example:',
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 10),
+
+            ElevatedButton(
+              onPressed: () => _showErrorNotification(),
+              child: const Text('Show Error Notification'),
             ),
           ],
         ),
@@ -156,5 +172,13 @@ class _ErrorDialogExampleState extends State<ErrorDialogExample> {
       // Connection failed, error dialog has been automatically displayed
       print('Connection failed, error dialog has been displayed');
     }
+  }
+
+  void _showErrorNotification() async {
+    await FlutterThermalPrinter.instance.showErrorNotification(
+      title: 'Printing Failed',
+      message: 'Unable to connect to printer',
+      type: ErrorType.printing,
+    );
   }
 }

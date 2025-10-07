@@ -36,7 +36,7 @@ class ErrorDialogManager {
 
     await showDialog(
       context: context,
-      barrierDismissible: false,
+      barrierDismissible: true,
       builder: (BuildContext context) {
         return AlertDialog(
           title: Row(
@@ -50,7 +50,7 @@ class ErrorDialogManager {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: const Text('确定'),
+              child: const Text('Confirm'),
             ),
             if (actionText != null && onAction != null)
               TextButton(
@@ -90,10 +90,7 @@ class ErrorDialogManager {
       title: 'Connection Failed',
       message: message,
       type: ErrorType.connection,
-      actionText: 'Retry',
-      onAction: () {
-        // 这里可以添加重连逻辑
-      },
+
     );
   }
 
@@ -127,10 +124,6 @@ class ErrorDialogManager {
       title: 'Bluetooth Error',
       message: message,
       type: ErrorType.bluetooth,
-      actionText: 'Settings',
-      onAction: () {
-        // 这里可以添加打开蓝牙设置的逻辑
-      },
     );
   }
 
