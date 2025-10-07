@@ -35,6 +35,7 @@ class _MyAppState extends State<MyApp> {
     await _flutterThermalPrinterPlugin.getDevices(connectionTypes: [
       ConnectionType.USB,
       ConnectionType.BLE,
+      ConnectionType.NETWORK,
     ]);
     _devicesStreamSubscription = _flutterThermalPrinterPlugin.devicesStream
         .listen((List<DeviceModel> event) {

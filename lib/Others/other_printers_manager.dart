@@ -588,13 +588,11 @@ class OtherPrinterManager {
   }
 
   void _sortDevices() {
-    // only return  name has caller cloud printer
-    _devices.removeWhere((element) =>
-        element.name == null ||
-        (!(element.name?.toLowerCase().contains('caller') ?? false)) ||
-        !(element.name?.toLowerCase().contains('cloud') ?? false) ||
-        !(element.name?.toLowerCase().contains('printer') ?? false) ||
-        element.name == '');
+    // Only keep devices whose name contains any of: 'caller', 'cloud', or 'printer' (case-insensitive)
+    _devices.removeWhere((element) {
+      final name = element.name?.toLowerCase() ?? '';
+      return name.isEmpty || (!name.contains('caller') && !name.contains('cloud') && !name.contains('printer'));
+    });
     // remove items having same vendorId
     Set<String> seen = {};
     _devices.retainWhere((element) {
@@ -606,8 +604,10 @@ class OtherPrinterManager {
         return true; // Keep
       }
     });
-
-    _devicesstream.add(_devices);
+    if (_devices.isNotEmpty) {
+      debugPrint('_sortDevices: ${_devices.map((e) => e.name).toList()}');
+      _devicesstream.add(_devices);
+    }
   }
 
   Future<void> turnOnBluetooth() async {
