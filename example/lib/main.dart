@@ -211,7 +211,7 @@ class _MyAppState extends State<MyApp> {
                       },
                       title: Text(printers[index].name ?? 'No Name'),
                       subtitle:
-                          Text("Connected: ${printers[index].isConnected}"),
+                          Text("Connected: ${printers[index].isConnected} -- ${printers[index].connectionType}"),
                       trailing: IconButton(
                         icon: const Icon(Icons.connect_without_contact),
                         onPressed: () async {

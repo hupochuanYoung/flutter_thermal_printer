@@ -149,6 +149,14 @@ class OtherPrinterManager {
         }
         _activeBluetoothConnections.remove(address);
       }
+
+      // 在连接前先验证设备是否可用（特别是对于绑定设备）
+      bool isDeviceAvailable = await _validateBondedDevice(address);
+      if (!isDeviceAvailable) {
+        debugPrint('Device $address is not available for connection');
+        return false;
+      }
+
       // 建立连接，增加超时时间
       BluetoothConnection? bt = await blueClassic.connect(address);
       if (bt == null) return false;
@@ -416,16 +424,17 @@ class OtherPrinterManager {
       blueClassic.startScan();
 
       // Get bonded devices (Android only)
-      if (Platform.isAndroid) {
-        final bondedDevices = await _getBLEBondedDevices();
-        _devices.addAll(bondedDevices);
-      }
+      // if (Platform.isAndroid) {
+      //   final bondedDevices = await _getBLEBondedDevices();
+      //   _devices.addAll(bondedDevices);
+      //   _sortDevices();
+      // }
 
-      _sortDevices();
 
       // Listen to scan results
       _bleSubscription = blueClassic.scanResults.listen((result) {
         BluetoothDevice bluetoothDevice = result;
+        debugPrint('find BLE: ${bluetoothDevice.name} ${bluetoothDevice.address} ${bluetoothDevice.bondState}');
         DeviceModel printer = DeviceModel(
           address: bluetoothDevice.address,
           name: bluetoothDevice.name,
@@ -445,18 +454,54 @@ class OtherPrinterManager {
     List<BluetoothDevice>? bondedDevices = await blueClassic.bondedDevices;
     if (bondedDevices == null) return [];
     List<DeviceModel> printers = [];
+
     for (var device in bondedDevices) {
-      printers.add(DeviceModel(
-        address: device.address,
-        name: device.name,
-        rssi: device.rssi,
-        connectionType: ConnectionType.BLE,
-        isConnected: _activeBluetoothConnections.containsKey(device.address),
-        bleDeviceType: device.type.name,
-      ));
+      // 验证绑定设备是否真的可用（没有被物理移除）
+      // bool isDeviceAvailable = await _validateBondedDevice(device.address);
+      if (true) {
+        printers.add(DeviceModel(
+          address: device.address,
+          name: device.name,
+          rssi: device.rssi,
+          connectionType: ConnectionType.BLE,
+          isConnected: _activeBluetoothConnections.containsKey(device.address),
+          bleDeviceType: device.type.name,
+        ));
+      } else {
+        debugPrint('Bonded device ${device.name} (${device.address}) is no longer available, skipping');
+      }
     }
 
     return printers;
+  }
+
+  /// 验证绑定设备是否真的可用（没有被物理移除）
+  Future<bool> _validateBondedDevice(String address) async {
+    try {
+      // 尝试快速连接来验证设备是否可用
+      // 使用较短的超时时间，避免长时间等待
+      final connection = await blueClassic.connect(address).timeout(
+        const Duration(seconds: 3),
+        onTimeout: () {
+          debugPrint('Timeout validating bonded device $address');
+          return null;
+        },
+      );
+
+      if (connection != null) {
+        // 如果连接成功，立即断开，我们只是为了验证设备可用性
+        try {
+          connection.dispose();
+        } catch (e) {
+          debugPrint('Error disposing validation connection: $e');
+        }
+        return true;
+      }
+      return false;
+    } catch (e) {
+      debugPrint('Failed to validate bonded device $address: $e');
+      return false;
+    }
   }
 
   Future<void> _getNetworkDevices(int cloudPrinterNum) async {
