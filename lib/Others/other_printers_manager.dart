@@ -465,7 +465,7 @@ class OtherPrinterManager {
         await stopScan(stopUsb: false, stopBle: true, stopNetwork: false);
       });
     } catch (e) {
-      _updateScanningState(ConnectionType.BLE, false);
+      await stopScan(stopUsb: false, stopBle: true, stopNetwork: false);
       rethrow;
     }
   }
