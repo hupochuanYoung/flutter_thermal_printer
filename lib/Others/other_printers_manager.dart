@@ -111,9 +111,11 @@ class OtherPrinterManager {
       if (stopUsb) {
         await _usbSubscription?.cancel();
         _updateScanningState(ConnectionType.USB, false);
+        debugPrint('stopScan USB');
       }
       if (stopNetwork) {
         _updateScanningState(ConnectionType.NETWORK, false);
+        debugPrint('stopScan NET');
       }
     } catch (e) {
       log('Failed to stop scanning for devices $e');
