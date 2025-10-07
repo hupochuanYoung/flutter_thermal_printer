@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:esc_pos_utils_plus/esc_pos_utils_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_thermal_printer/utils/printer.dart';
+import 'package:flutter_thermal_printer/utils/error_dialog_manager.dart';
 import 'package:image/image.dart' as img;
 import 'package:screenshot/screenshot.dart';
 
@@ -83,7 +84,7 @@ class FlutterThermalPrinter {
     if (Platform.isWindows) {
       return false;
     } else {
-      return  await OtherPrinterManager.instance.disconnect(device);
+      return await OtherPrinterManager.instance.disconnect(device);
     }
   }
 
@@ -151,6 +152,104 @@ class FlutterThermalPrinter {
     }
   }
 
+  // Error Dialog Methods
+  /// 初始化错误弹窗管理器
+  Future<void> initializeErrorDialog() async {
+    await ErrorDialogManager.instance.initialize();
+  }
+
+  /// 设置用于显示错误弹窗的BuildContext
+  void setErrorDialogContext(BuildContext context) {
+    if (!Platform.isWindows) {
+      OtherPrinterManager.instance.setContext(context);
+    }
+  }
+
+  /// 显示连接错误弹窗
+  Future<void> showConnectionError(
+    BuildContext context, {
+    required String deviceName,
+    String? customMessage,
+  }) async {
+    await ErrorDialogManager.instance.showConnectionError(
+      context,
+      deviceName: deviceName,
+      customMessage: customMessage,
+    );
+  }
+
+  /// 显示打印错误弹窗
+  Future<void> showPrintingError(
+    BuildContext context, {
+    required String deviceName,
+    String? customMessage,
+  }) async {
+    await ErrorDialogManager.instance.showPrintingError(
+      context,
+      deviceName: deviceName,
+      customMessage: customMessage,
+    );
+  }
+
+  /// 显示蓝牙错误弹窗
+  Future<void> showBluetoothError(
+    BuildContext context, {
+    String? customMessage,
+  }) async {
+    await ErrorDialogManager.instance.showBluetoothError(
+      context,
+      customMessage: customMessage,
+    );
+  }
+
+  /// 显示USB错误弹窗
+  Future<void> showUsbError(
+    BuildContext context, {
+    String? customMessage,
+  }) async {
+    await ErrorDialogManager.instance.showUsbError(
+      context,
+      customMessage: customMessage,
+    );
+  }
+
+  /// 显示网络错误弹窗
+  Future<void> showNetworkError(
+    BuildContext context, {
+    String? customMessage,
+  }) async {
+    await ErrorDialogManager.instance.showNetworkError(
+      context,
+      customMessage: customMessage,
+    );
+  }
+
+  /// 显示通用错误弹窗
+  Future<void> showGeneralError(
+    BuildContext context, {
+    required String title,
+    required String message,
+  }) async {
+    await ErrorDialogManager.instance.showGeneralError(
+      context,
+      title: title,
+      message: message,
+    );
+  }
+
+  /// 显示错误通知（不阻塞UI）
+  Future<void> showErrorNotification({
+    required String title,
+    required String message,
+    ErrorType type = ErrorType.general,
+  }) async {
+    await ErrorDialogManager.instance.showErrorNotification(
+      title: title,
+      message: message,
+      type: type,
+    );
+  }
+
   Future<Uint8List> screenShotWidget(
     BuildContext context, {
     required Widget widget,
@@ -161,7 +260,7 @@ class FlutterThermalPrinter {
   }) async {
     final controller = ScreenshotController();
     final image = await controller.captureFromLongWidget(widget,
-        pixelRatio:1,
+        pixelRatio: 1,
         // View.of(context).devicePixelRatio,
         delay: delay);
     Generator? generator0;
@@ -239,7 +338,7 @@ class FlutterThermalPrinter {
     final image = await controller.captureFromLongWidget(
       widget,
       pixelRatio: 1,
-        // View.of(context).devicePixelRatio,
+      // View.of(context).devicePixelRatio,
       delay: delay,
     );
     if (printer.connectionType == ConnectionType.BLE) {
