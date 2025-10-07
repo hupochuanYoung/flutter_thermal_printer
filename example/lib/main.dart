@@ -198,9 +198,12 @@ class _MyAppState extends State<MyApp> {
                         if (printers[index].isConnected ?? false) {
                          bool res=  await _flutterThermalPrinterPlugin
                               .disconnect(printers[index]);
-                         setState(() {
-                           printers[index].isConnected = res;
-                         });
+                         if(res){
+                           setState(() {
+                             printers[index].isConnected = false;
+                           });
+                         }
+
                         } else {
                           bool res = await _flutterThermalPrinterPlugin
                               .connect(printers[index]);

@@ -142,6 +142,9 @@ class OtherPrinterManager {
     try {
       // Clean up any existing connection first
       if (_activeBluetoothConnections.containsKey(address)) {
+        if (_activeBluetoothConnections[address]?.isConnected ?? false) {
+          return true;
+        }
         try {
           _activeBluetoothConnections[address]?.dispose();
         } catch (e) {
@@ -149,14 +152,6 @@ class OtherPrinterManager {
         }
         _activeBluetoothConnections.remove(address);
       }
-
-      // 在连接前先验证设备是否可用（特别是对于绑定设备）
-      bool isDeviceAvailable = await _validateBondedDevice(address);
-      if (!isDeviceAvailable) {
-        debugPrint('Device $address is not available for connection');
-        return false;
-      }
-
       // 建立连接，增加超时时间
       BluetoothConnection? bt = await blueClassic.connect(address);
       if (bt == null) return false;
@@ -429,7 +424,6 @@ class OtherPrinterManager {
       //   _devices.addAll(bondedDevices);
       //   _sortDevices();
       // }
-
 
       // Listen to scan results
       _bleSubscription = blueClassic.scanResults.listen((result) {
