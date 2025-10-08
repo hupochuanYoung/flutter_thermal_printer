@@ -318,7 +318,7 @@ class OtherPrinterManager {
   // 分片发送数据到蓝牙设备
   Future<void> _sendDataInChunks(
       BluetoothConnection bt, List<int> bytes) async {
-    const int chunkSize = 256; // 每片1024字节，平衡速度和稳定性
+    const int chunkSize = 512; // 每片1024字节，平衡速度和稳定性
     const int delayMs = 10; // 减少延迟到5ms，提高流畅性
     for (int i = 0; i < bytes.length; i += chunkSize) {
       final end = (i + chunkSize < bytes.length) ? i + chunkSize : bytes.length;
