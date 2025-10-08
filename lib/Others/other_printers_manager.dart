@@ -302,7 +302,7 @@ class OtherPrinterManager {
         }
 
         // 对于蓝牙设备，如果数据较长或明确标记为长数据，进行分片发送
-        if (longData || bytes.length > 2048) {
+        if (longData || bytes.length > 1024) {
           await _sendDataInChunks(bt!, bytes);
         } else {
           bt!.output.add(Uint8List.fromList(bytes));
@@ -318,20 +318,13 @@ class OtherPrinterManager {
   // 分片发送数据到蓝牙设备
   Future<void> _sendDataInChunks(
       BluetoothConnection bt, List<int> bytes) async {
-    const int chunkSize = 1024; // 每片1024字节，平衡速度和稳定性
-    const int delayMs = 5; // 减少延迟到5ms，提高流畅性
-
+    const int chunkSize = 256; // 每片1024字节，平衡速度和稳定性
+    const int delayMs = 10; // 减少延迟到5ms，提高流畅性
     for (int i = 0; i < bytes.length; i += chunkSize) {
-      int end = (i + chunkSize < bytes.length) ? i + chunkSize : bytes.length;
-      List<int> chunk = bytes.sublist(i, end);
-
-      bt.output.add(Uint8List.fromList(chunk));
+      final end = (i + chunkSize < bytes.length) ? i + chunkSize : bytes.length;
+      bt.output.add(Uint8List.fromList(bytes.sublist(i, end)));
       await bt.output.allSent;
-
-      // 只在必要时添加延迟
-      if (end < bytes.length && bytes.length > 4096) {
-        await Future.delayed(const Duration(milliseconds: delayMs));
-      }
+      await Future.delayed(const Duration(milliseconds: delayMs));
     }
   }
 
