@@ -32,8 +32,7 @@ class FlutterThermalPrinter {
 
   Stream<ScanningEvent> get scanningStream {
     if (Platform.isWindows) {
-      return Stream.value(
-          ScanningEvent(connectionType: ConnectionType.USB, isScanning: false));
+      return Stream.value(ScanningEvent(connectionType: ConnectionType.USB, isScanning: false));
     } else {
       return OtherPrinterManager.instance.scanningStream;
     }
@@ -83,18 +82,18 @@ class FlutterThermalPrinter {
     if (Platform.isWindows) {
       return false;
     } else {
-      return  await OtherPrinterManager.instance.disconnect(device);
+      return await OtherPrinterManager.instance.disconnect(device);
     }
   }
 
-  Future<void> printData(
+  Future<bool> printData(
     DeviceModel device,
     List<int> bytes, {
     bool longData = false,
     bool withoutResponse = false,
   }) async {
     if (Platform.isWindows) {
-      return;
+      return false;
     } else {
       return await OtherPrinterManager.instance.printData(
         device,
@@ -161,7 +160,7 @@ class FlutterThermalPrinter {
   }) async {
     final controller = ScreenshotController();
     final image = await controller.captureFromLongWidget(widget,
-        pixelRatio:1,
+        pixelRatio: 1,
         // View.of(context).devicePixelRatio,
         delay: delay);
     Generator? generator0;
@@ -219,7 +218,7 @@ class FlutterThermalPrinter {
     return number + (8 - (number % 8));
   }
 
-  Future<void> printWidget(
+  Future<bool> printWidget(
     BuildContext context, {
     required DeviceModel printer,
     required Widget widget,
@@ -229,80 +228,107 @@ class FlutterThermalPrinter {
     bool printOnBle = false,
     bool cutAfterPrinted = true,
   }) async {
-    // if (printOnBle == false && printer.connectionType == ConnectionType.BLE) {
-    //   throw Exception(
-    //     "Image printing on BLE Printer may be slow or fail. Still Need try? set printOnBle to true",
-    //   );
-    // }
-    final controller = ScreenshotController();
+    try {
+      // if (printOnBle == false && printer.connectionType == ConnectionType.BLE) {
+      //   throw Exception(
+      //     "Image printing on BLE Printer may be slow or fail. Still Need try? set printOnBle to true",
+      //   );
+      // }
+      final controller = ScreenshotController();
 
-    final image = await controller.captureFromLongWidget(
-      widget,
-      pixelRatio: 1,
+      final image = await controller.captureFromLongWidget(
+        widget,
+        pixelRatio: 1,
         // View.of(context).devicePixelRatio,
-      delay: delay,
-    );
-    if (printer.connectionType == ConnectionType.BLE) {
+        delay: delay,
+      );
+
+      if (printer.connectionType == ConnectionType.BLE) {
+        CapabilityProfile profile0 = profile ?? await CapabilityProfile.load();
+        final ticket = Generator(paperSize, profile0);
+        img.Image? imagebytes = img.decodeImage(image);
+        imagebytes = _buildImageRasterAvaliable(imagebytes!);
+        final raster = ticket.imageRaster(
+          imagebytes,
+          imageFn: PosImageFn.bitImageRaster,
+        );
+
+        bool printSuccess = await FlutterThermalPrinter.instance.printData(
+          printer,
+          raster,
+          longData: true,
+        );
+
+        if (!printSuccess) {
+          throw Exception("Failed to print image data to BLE device");
+        }
+
+        if (cutAfterPrinted) {
+          bool cutSuccess = await FlutterThermalPrinter.instance.printData(
+            printer,
+            ticket.cut(),
+            longData: true,
+          );
+
+          if (!cutSuccess) {
+            throw Exception("Failed to cut paper after printing");
+          }
+        }
+        return true;
+      }
+
       CapabilityProfile profile0 = profile ?? await CapabilityProfile.load();
       final ticket = Generator(paperSize, profile0);
       img.Image? imagebytes = img.decodeImage(image);
       imagebytes = _buildImageRasterAvaliable(imagebytes!);
-      final raster = ticket.imageRaster(
-        imagebytes,
-        imageFn: PosImageFn.bitImageRaster,
-      );
-      await FlutterThermalPrinter.instance.printData(
-        printer,
-        raster,
-        longData: true,
-      );
+      final totalheight = imagebytes.height;
+      final totalwidth = imagebytes.width;
+      final timestoCut = totalheight ~/ 30;
+
+      for (var i = 0; i < timestoCut; i++) {
+        final croppedImage = img.copyCrop(
+          imagebytes,
+          x: 0,
+          y: i * 30,
+          width: totalwidth,
+          height: 30,
+        );
+        final raster = ticket.imageRaster(
+          croppedImage,
+          imageFn: PosImageFn.bitImageRaster,
+        );
+
+        bool printSuccess = await FlutterThermalPrinter.instance.printData(
+          printer,
+          raster,
+          longData: true,
+        );
+
+        if (!printSuccess) {
+          throw Exception("Failed to print image chunk $i of $timestoCut");
+        }
+      }
 
       if (cutAfterPrinted) {
-        await FlutterThermalPrinter.instance.printData(
+        bool cutSuccess = await FlutterThermalPrinter.instance.printData(
           printer,
           ticket.cut(),
           longData: true,
         );
+
+        if (!cutSuccess) {
+          throw Exception("Failed to cut paper after printing");
+        }
       }
-      return;
-    }
 
-    CapabilityProfile profile0 = profile ?? await CapabilityProfile.load();
-    final ticket = Generator(paperSize, profile0);
-    img.Image? imagebytes = img.decodeImage(image);
-    imagebytes = _buildImageRasterAvaliable(imagebytes!);
-    final totalheight = imagebytes.height;
-    final totalwidth = imagebytes.width;
-    final timestoCut = totalheight ~/ 30;
-
-    for (var i = 0; i < timestoCut; i++) {
-      final croppedImage = img.copyCrop(
-        imagebytes,
-        x: 0,
-        y: i * 30,
-        width: totalwidth,
-        height: 30,
-      );
-      final raster = ticket.imageRaster(
-        croppedImage,
-        imageFn: PosImageFn.bitImageRaster,
-      );
-      await FlutterThermalPrinter.instance.printData(
-        printer,
-        raster,
-        longData: true,
-      );
-    }
-    if (cutAfterPrinted) {
-      await FlutterThermalPrinter.instance.printData(
-        printer,
-        ticket.cut(),
-        longData: true,
-      );
+      return true;
+    } catch (e) {
+      // Re-throw the exception with more context
+      throw Exception("Failed to print widget: $e");
     }
   }
 
-  Future<void> printImageBytes({
+  Future<bool> printImageBytes({
     required Uint8List imageBytes,
     required DeviceModel printer,
     Duration delay = const Duration(milliseconds: 100),
@@ -312,40 +338,53 @@ class FlutterThermalPrinter {
     bool printOnBle = false,
     int? customWidth,
   }) async {
-    if (printOnBle == false && printer.connectionType == ConnectionType.BLE) {
-      throw Exception(
-        "Image printing on BLE Printer may be slow or fail. Still Need try? set printOnBle to true",
-      );
-    }
+    try {
+      if (printOnBle == false && printer.connectionType == ConnectionType.BLE) {
+        throw Exception(
+          "Image printing on BLE Printer may be slow or fail. Still Need try? set printOnBle to true",
+        );
+      }
 
-    CapabilityProfile profile0 = profile ?? await CapabilityProfile.load();
-    final ticket = generator ?? Generator(paperSize, profile0);
-    img.Image? imagebytes = img.decodeImage(imageBytes);
-    if (customWidth != null) {
-      final width = _makeDivisibleBy8(customWidth);
-      imagebytes = img.copyResize(imagebytes!, width: width);
-    }
-    imagebytes = _buildImageRasterAvaliable(imagebytes!);
-    final totalheight = imagebytes.height;
-    final totalwidth = imagebytes.width;
-    final timestoCut = totalheight ~/ 30;
-    for (var i = 0; i < timestoCut; i++) {
-      final croppedImage = img.copyCrop(
-        imagebytes,
-        x: 0,
-        y: i * 30,
-        width: totalwidth,
-        height: 30,
-      );
-      final raster = ticket.imageRaster(
-        croppedImage,
-        imageFn: PosImageFn.bitImageRaster,
-      );
-      await FlutterThermalPrinter.instance.printData(
-        printer,
-        raster,
-        longData: true,
-      );
+      CapabilityProfile profile0 = profile ?? await CapabilityProfile.load();
+      final ticket = generator ?? Generator(paperSize, profile0);
+      img.Image? imagebytes = img.decodeImage(imageBytes);
+      if (customWidth != null) {
+        final width = _makeDivisibleBy8(customWidth);
+        imagebytes = img.copyResize(imagebytes!, width: width);
+      }
+      imagebytes = _buildImageRasterAvaliable(imagebytes!);
+      final totalheight = imagebytes.height;
+      final totalwidth = imagebytes.width;
+      final timestoCut = totalheight ~/ 30;
+
+      for (var i = 0; i < timestoCut; i++) {
+        final croppedImage = img.copyCrop(
+          imagebytes,
+          x: 0,
+          y: i * 30,
+          width: totalwidth,
+          height: 30,
+        );
+        final raster = ticket.imageRaster(
+          croppedImage,
+          imageFn: PosImageFn.bitImageRaster,
+        );
+
+        bool printSuccess = await FlutterThermalPrinter.instance.printData(
+          printer,
+          raster,
+          longData: true,
+        );
+
+        if (!printSuccess) {
+          throw Exception("Failed to print image chunk $i of $timestoCut");
+        }
+      }
+
+      return true;
+    } catch (e) {
+      // Re-throw the exception with more context
+      throw Exception("Failed to print image bytes: $e");
     }
   }
 }
