@@ -256,7 +256,7 @@ class OtherPrinterManager {
   }
 
   // Print data to BLE device
-  Future<bool> printData(
+  Future<void> printData(
     DeviceModel device,
     List<int> bytes, {
     bool longData = false,
@@ -269,7 +269,6 @@ class OtherPrinterManager {
           Uint8List.fromList(bytes),
           path: device.address,
         );
-        return true;
       } catch (e) {
         log("FlutterThermalPrinter: Unable to Print Data $e");
         throw Exception("Failed to print to USB device: $e");
@@ -278,22 +277,22 @@ class OtherPrinterManager {
       try {
         BluetoothConnection? bt = _activeBluetoothConnections[device.address!];
         if (bt == null) {
-          log('Device is not connected');
+          log('Device is not connected null');
           // 更新设备连接状态为false
           _updateBleConnectionStatus(device.address!, false);
           throw Exception("Device is not connected");
         }
         if (!bt.isConnected) {
           // 更新状态并清理无效连接
+          log('Device is not connected (false)');
           _updateBleConnectionStatus(device.address!, false);
           // 尝试重新连接
-          bool isConnected = await bluetoothConnect(device.address!);
-          if (!isConnected) {
-            log('Reconnection failed for ${device.address}');
-            throw Exception("Failed to reconnect to device");
-          }
+          // bool isConnected = await bluetoothConnect(device.address!);
+          // if (!isConnected) {
+          throw Exception("Device is not connected");
+          // }
           // 获取新的连接对象
-          bt = _activeBluetoothConnections[device.address!];
+          // bt = _activeBluetoothConnections[device.address!];
         }
 
         // 对于蓝牙设备，如果数据较长或明确标记为长数据，进行分片发送
@@ -303,7 +302,6 @@ class OtherPrinterManager {
           bt!.output.add(Uint8List.fromList(bytes));
           await bt.output.allSent;
         }
-        return true;
       } catch (e) {
         log('Failed to print data to device $e');
         if (e is Exception) {

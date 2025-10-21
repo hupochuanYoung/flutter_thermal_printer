@@ -86,16 +86,16 @@ class FlutterThermalPrinter {
     }
   }
 
-  Future<bool> printData(
+  Future<void> printData(
     DeviceModel device,
     List<int> bytes, {
     bool longData = false,
     bool withoutResponse = false,
   }) async {
     if (Platform.isWindows) {
-      return false;
+      throw Exception("Do not support Windows");
     } else {
-      return await OtherPrinterManager.instance.printData(
+      await OtherPrinterManager.instance.printData(
         device,
         bytes,
         longData: longData,
@@ -253,26 +253,18 @@ class FlutterThermalPrinter {
           imageFn: PosImageFn.bitImageRaster,
         );
 
-        bool printSuccess = await FlutterThermalPrinter.instance.printData(
+        await FlutterThermalPrinter.instance.printData(
           printer,
           raster,
           longData: true,
         );
 
-        if (!printSuccess) {
-          throw Exception("Failed to print image data to BLE device");
-        }
-
         if (cutAfterPrinted) {
-          bool cutSuccess = await FlutterThermalPrinter.instance.printData(
+          await FlutterThermalPrinter.instance.printData(
             printer,
             ticket.cut(),
             longData: true,
           );
-
-          if (!cutSuccess) {
-            throw Exception("Failed to cut paper after printing");
-          }
         }
         return true;
       }
@@ -298,27 +290,19 @@ class FlutterThermalPrinter {
           imageFn: PosImageFn.bitImageRaster,
         );
 
-        bool printSuccess = await FlutterThermalPrinter.instance.printData(
+        await FlutterThermalPrinter.instance.printData(
           printer,
           raster,
           longData: true,
         );
-
-        if (!printSuccess) {
-          throw Exception("Failed to print image chunk $i of $timestoCut");
-        }
       }
 
       if (cutAfterPrinted) {
-        bool cutSuccess = await FlutterThermalPrinter.instance.printData(
+        await FlutterThermalPrinter.instance.printData(
           printer,
           ticket.cut(),
           longData: true,
         );
-
-        if (!cutSuccess) {
-          throw Exception("Failed to cut paper after printing");
-        }
       }
 
       return true;
@@ -370,15 +354,11 @@ class FlutterThermalPrinter {
           imageFn: PosImageFn.bitImageRaster,
         );
 
-        bool printSuccess = await FlutterThermalPrinter.instance.printData(
+        await FlutterThermalPrinter.instance.printData(
           printer,
           raster,
           longData: true,
         );
-
-        if (!printSuccess) {
-          throw Exception("Failed to print image chunk $i of $timestoCut");
-        }
       }
 
       return true;
