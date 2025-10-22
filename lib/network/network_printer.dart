@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'network_print_result.dart';
 
@@ -58,6 +59,12 @@ class FlutterThermalPrinterNetwork {
       _socket!.add(data);
       await _socket!.flush();
 
+      bool confirmed = await verifyPrinterStatus();
+      if (!confirmed) {
+        await disconnect();
+        return NetworkPrintResult.timeout;
+      }
+
       if (isDisconnect) {
         await disconnect();
       }
@@ -68,6 +75,28 @@ class FlutterThermalPrinterNetwork {
       return NetworkPrintResult.timeout;
     } catch (e) {
       return NetworkPrintResult.timeout;
+    }
+  }
+  Future<bool> verifyPrinterStatus() async {
+    try {
+      _socket!.add([0x10, 0x04, 0x01]);
+      await _socket!.flush();
+
+      final completer = Completer<bool>();
+      List<int> buffer = [];
+
+      _socket!.listen((data) {
+        buffer.addAll(data);
+        completer.complete(true);
+      }, onError: (_) {
+        completer.complete(false);
+      }, onDone: () {
+        completer.complete(false);
+      });
+
+      return await completer.future.timeout(const Duration(seconds: 2), onTimeout: () => false);
+    } catch (_) {
+      return false;
     }
   }
 
