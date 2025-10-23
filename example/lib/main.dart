@@ -196,14 +196,13 @@ class _MyAppState extends State<MyApp> {
                     return ListTile(
                       onTap: () async {
                         if (printers[index].isConnected ?? false) {
-                         bool res=  await _flutterThermalPrinterPlugin
+                          bool res = await _flutterThermalPrinterPlugin
                               .disconnect(printers[index]);
-                         if(res){
-                           setState(() {
-                             printers[index].isConnected = false;
-                           });
-                         }
-
+                          if (res) {
+                            setState(() {
+                              printers[index].isConnected = false;
+                            });
+                          }
                         } else {
                           bool res = await _flutterThermalPrinterPlugin
                               .connect(printers[index]);
@@ -213,8 +212,8 @@ class _MyAppState extends State<MyApp> {
                         }
                       },
                       title: Text(printers[index].name ?? 'No Name'),
-                      subtitle:
-                          Text("Connected: ${printers[index].isConnected} -- ${printers[index].connectionType}"),
+                      subtitle: Text(
+                          "Connected: ${printers[index].isConnected} -- ${printers[index].connectionType}"),
                       trailing: IconButton(
                         icon: const Icon(Icons.connect_without_contact),
                         onPressed: () async {

@@ -2,6 +2,32 @@ import 'dart:async';
 import 'dart:io';
 import 'network_print_result.dart';
 
+/// Printer status information
+class PrinterStatus {
+  final bool isConnected;
+  final bool isOnline;
+  final bool hasPaper;
+  final bool isReady;
+  final String? errorMessage;
+  final DateTime timestamp;
+
+  const PrinterStatus({
+    required this.isConnected,
+    required this.isOnline,
+    required this.hasPaper,
+    required this.isReady,
+    this.errorMessage,
+    required this.timestamp,
+  });
+
+  @override
+  String toString() {
+    return 'PrinterStatus(isConnected: $isConnected, isOnline: $isOnline, '
+        'hasPaper: $hasPaper, isReady: $isReady, errorMessage: $errorMessage, '
+        'timestamp: $timestamp)';
+  }
+}
+
 /// Optimized network thermal printer with improved connection management
 class FlutterThermalPrinterNetwork {
   FlutterThermalPrinterNetwork(
@@ -58,13 +84,6 @@ class FlutterThermalPrinterNetwork {
 
       _socket!.add(data);
       await _socket!.flush();
-      final delay = Duration(milliseconds: (data.length / 512).clamp(300, 2000).toInt());
-      await Future.delayed(delay);
-      bool confirmed = await verifyPrinterStatusSafe();
-      if (!confirmed) {
-        await disconnect();
-        return NetworkPrintResult.timeout;
-      }
 
       if (isDisconnect) {
         await disconnect();
@@ -76,38 +95,6 @@ class FlutterThermalPrinterNetwork {
       return NetworkPrintResult.timeout;
     } catch (e) {
       return NetworkPrintResult.timeout;
-    }
-  }
-
-  Future<bool> verifyPrinterStatusSafe() async {
-    if (_socket == null) return false;
-    try {
-      _socket!.add([0x10, 0x04, 0x01]);
-      await _socket!.flush();
-
-      final completer = Completer<bool>();
-      late StreamSubscription<List<int>> sub;
-
-      sub = _socket!.listen(
-            (data) {
-          if (!completer.isCompleted) completer.complete(true);
-        },
-        onError: (_) {
-          if (!completer.isCompleted) completer.complete(false);
-        },
-        onDone: () {
-          if (!completer.isCompleted) completer.complete(false);
-        },
-        cancelOnError: true,
-      );
-
-      final result = await completer.future
-          .timeout(const Duration(seconds: 2), onTimeout: () => false);
-      await sub.cancel();
-
-      return result;
-    } catch (_) {
-      return false;
     }
   }
 
@@ -133,7 +120,7 @@ class FlutterThermalPrinterNetwork {
     }
   }
 
-  /// Check if currently connected
+  /// Check if currently connected without sending commands
   bool get isConnected => _isConnected && _socket != null;
 
   /// Get connection info
