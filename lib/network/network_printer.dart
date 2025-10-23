@@ -4,11 +4,11 @@ import 'network_print_result.dart';
 
 /// Optimized network thermal printer with improved connection management
 class FlutterThermalPrinterNetwork {
-  FlutterThermalPrinterNetwork(
-    String host, {
+  FlutterThermalPrinterNetwork(String host, {
     int port = 9100,
     Duration timeout = const Duration(seconds: 5),
-  })  : _host = host,
+  })
+      : _host = host,
         _port = port,
         _timeout = timeout;
   final String _host;
@@ -44,8 +44,7 @@ class FlutterThermalPrinterNetwork {
   }
 
   /// Print data with automatic connection management
-  Future<NetworkPrintResult> printTicket(
-    List<int> data, {
+  Future<NetworkPrintResult> printTicket(List<int> data, {
     bool isDisconnect = true,
   }) async {
     try {
@@ -56,18 +55,26 @@ class FlutterThermalPrinterNetwork {
         }
       }
 
-      _socket!.add(data);
-      await _socket!.flush();
+      final sendFuture = Future(() async {
+        _socket!.add(data);
+        await _socket!.flush();
+      });
+      await sendFuture.timeout(const Duration(seconds: 8));
 
       if (isDisconnect) {
         await disconnect();
       }
 
       return NetworkPrintResult.success;
+    }
+    on TimeoutException {
+      await disconnect();
+      return NetworkPrintResult.timeout;
     } on SocketException {
-      _isConnected = false;
+      await disconnect();
       return NetworkPrintResult.timeout;
     } catch (e) {
+      await disconnect();
       return NetworkPrintResult.timeout;
     }
   }
