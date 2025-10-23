@@ -77,6 +77,7 @@ class FlutterThermalPrinterNetwork {
       return NetworkPrintResult.timeout;
     }
   }
+
   Future<bool> verifyPrinterStatus() async {
     try {
       _socket!.add([0x10, 0x04, 0x01]);
@@ -84,14 +85,22 @@ class FlutterThermalPrinterNetwork {
 
       final completer = Completer<bool>();
       List<int> buffer = [];
+      bool isCompleted = false;
+
+      void completeOnce(bool value) {
+        if (!isCompleted) {
+          isCompleted = true;
+          completer.complete(value);
+        }
+      }
 
       _socket!.listen((data) {
         buffer.addAll(data);
-        completer.complete(true);
+        completeOnce(true);
       }, onError: (_) {
-        completer.complete(false);
+        completeOnce(false);
       }, onDone: () {
-        completer.complete(false);
+        completeOnce(false);
       });
 
       return await completer.future.timeout(const Duration(seconds: 2), onTimeout: () => false);
