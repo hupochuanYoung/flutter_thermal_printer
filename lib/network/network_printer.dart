@@ -58,8 +58,9 @@ class FlutterThermalPrinterNetwork {
 
       _socket!.add(data);
       await _socket!.flush();
-
-      bool confirmed = await verifyPrinterStatus();
+      final delay = Duration(milliseconds: (data.length / 512).clamp(300, 2000).toInt());
+      await Future.delayed(delay);
+      bool confirmed = await verifyPrinterStatusSafe();
       if (!confirmed) {
         await disconnect();
         return NetworkPrintResult.timeout;
@@ -78,32 +79,33 @@ class FlutterThermalPrinterNetwork {
     }
   }
 
-  Future<bool> verifyPrinterStatus() async {
+  Future<bool> verifyPrinterStatusSafe() async {
+    if (_socket == null) return false;
     try {
       _socket!.add([0x10, 0x04, 0x01]);
       await _socket!.flush();
 
       final completer = Completer<bool>();
-      List<int> buffer = [];
-      bool isCompleted = false;
+      late StreamSubscription<List<int>> sub;
 
-      void completeOnce(bool value) {
-        if (!isCompleted) {
-          isCompleted = true;
-          completer.complete(value);
-        }
-      }
+      sub = _socket!.listen(
+            (data) {
+          if (!completer.isCompleted) completer.complete(true);
+        },
+        onError: (_) {
+          if (!completer.isCompleted) completer.complete(false);
+        },
+        onDone: () {
+          if (!completer.isCompleted) completer.complete(false);
+        },
+        cancelOnError: true,
+      );
 
-      _socket!.listen((data) {
-        buffer.addAll(data);
-        completeOnce(true);
-      }, onError: (_) {
-        completeOnce(false);
-      }, onDone: () {
-        completeOnce(false);
-      });
+      final result = await completer.future
+          .timeout(const Duration(seconds: 2), onTimeout: () => false);
+      await sub.cancel();
 
-      return await completer.future.timeout(const Duration(seconds: 2), onTimeout: () => false);
+      return result;
     } catch (_) {
       return false;
     }
