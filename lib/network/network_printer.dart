@@ -2,32 +2,6 @@ import 'dart:async';
 import 'dart:io';
 import 'network_print_result.dart';
 
-/// Printer status information
-class PrinterStatus {
-  final bool isConnected;
-  final bool isOnline;
-  final bool hasPaper;
-  final bool isReady;
-  final String? errorMessage;
-  final DateTime timestamp;
-
-  const PrinterStatus({
-    required this.isConnected,
-    required this.isOnline,
-    required this.hasPaper,
-    required this.isReady,
-    this.errorMessage,
-    required this.timestamp,
-  });
-
-  @override
-  String toString() {
-    return 'PrinterStatus(isConnected: $isConnected, isOnline: $isOnline, '
-        'hasPaper: $hasPaper, isReady: $isReady, errorMessage: $errorMessage, '
-        'timestamp: $timestamp)';
-  }
-}
-
 /// Optimized network thermal printer with improved connection management
 class FlutterThermalPrinterNetwork {
   FlutterThermalPrinterNetwork(
@@ -120,7 +94,7 @@ class FlutterThermalPrinterNetwork {
     }
   }
 
-  /// Check if currently connected without sending commands
+  /// Check if currently connected
   bool get isConnected => _isConnected && _socket != null;
 
   /// Get connection info
