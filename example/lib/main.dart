@@ -28,6 +28,7 @@ class _MyAppState extends State<MyApp> {
   List<DeviceModel> printers = [];
 
   StreamSubscription<List<DeviceModel>>? _devicesStreamSubscription;
+  DeviceModel? currentDevice;
 
   // Get Printer List
   void startScan() async {
@@ -37,13 +38,11 @@ class _MyAppState extends State<MyApp> {
       ConnectionType.BLE,
       ConnectionType.NETWORK,
     ]);
-    _devicesStreamSubscription = _flutterThermalPrinterPlugin.devicesStream
-        .listen((List<DeviceModel> event) {
+    _devicesStreamSubscription = _flutterThermalPrinterPlugin.devicesStream.listen((List<DeviceModel> event) {
       log(event.map((e) => e.name).toList().toString());
       setState(() {
         printers = event;
-        printers.removeWhere(
-            (element) => element.name == null || element.name == '');
+        printers.removeWhere((element) => element.name == null || element.name == '');
       });
     });
   }
@@ -115,8 +114,7 @@ class _MyAppState extends State<MyApp> {
                         final generator = Generator(PaperSize.mm80, profile);
                         List<int> bytes = [];
                         if (context.mounted) {
-                          bytes = await FlutterThermalPrinter.instance
-                              .screenShotWidget(
+                          bytes = await FlutterThermalPrinter.instance.screenShotWidget(
                             context,
                             generator: generator,
                             widget: receiptWidget("Network"),
@@ -133,8 +131,7 @@ class _MyAppState extends State<MyApp> {
                   Expanded(
                     child: ElevatedButton(
                       onPressed: () async {
-                        final service = FlutterThermalPrinterNetwork(_ip,
-                            port: int.parse(_port));
+                        final service = FlutterThermalPrinterNetwork(_ip, port: int.parse(_port));
                         await service.connect();
                         final bytes = await _generateReceipt();
                         await service.printTicket(bytes);
@@ -179,11 +176,34 @@ class _MyAppState extends State<MyApp> {
                         await _flutterThermalPrinterPlugin.printWidget(
                           context,
                           printer: printers[1],
-                          widget:
-                              receiptWidget(printers[1].connectionTypeString),
+                          widget: receiptWidget(printers[1].connectionTypeString),
                         );
                       },
                       child: const Text('Print receipt'),
+                    ),
+                  ),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        if (currentDevice != null && (currentDevice!.name ?? "").toLowerCase().contains("caller")) {
+                          _flutterThermalPrinterPlugin.startListening(currentDevice!);
+                        }
+                      },
+                      child: currentDevice == null
+                          ? const Text('Start listening')
+                          : Text('${currentDevice?.name} Start listening'),
+                    ),
+                  ),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        if (currentDevice != null && (currentDevice!.name ?? "").toLowerCase().contains("caller")) {
+                          _flutterThermalPrinterPlugin.stopListening();
+                        }
+                      },
+                      child: currentDevice == null
+                          ? const Text('Stop listening')
+                          : Text('${currentDevice?.name} Stop listening'),
                     ),
                   ),
                 ],
@@ -196,24 +216,22 @@ class _MyAppState extends State<MyApp> {
                     return ListTile(
                       onTap: () async {
                         if (printers[index].isConnected ?? false) {
-                          bool res = await _flutterThermalPrinterPlugin
-                              .disconnect(printers[index]);
+                          bool res = await _flutterThermalPrinterPlugin.disconnect(printers[index]);
                           if (res) {
                             setState(() {
                               printers[index].isConnected = false;
                             });
                           }
                         } else {
-                          bool res = await _flutterThermalPrinterPlugin
-                              .connect(printers[index]);
+                          bool res = await _flutterThermalPrinterPlugin.connect(printers[index]);
                           setState(() {
                             printers[index].isConnected = res;
                           });
                         }
+                        currentDevice = printers[index];
                       },
                       title: Text(printers[index].name ?? 'No Name'),
-                      subtitle: Text(
-                          "Connected: ${printers[index].isConnected} -- ${printers[index].connectionType}"),
+                      subtitle: Text("Connected: ${printers[index].isConnected} -- ${printers[index].connectionType}"),
                       trailing: IconButton(
                         icon: const Icon(Icons.connect_without_contact),
                         onPressed: () async {
@@ -296,8 +314,7 @@ class _MyAppState extends State<MyApp> {
   }
 }
 
-Widget _buildReceiptRow(String leftText, String rightText,
-    {bool isBold = false}) {
+Widget _buildReceiptRow(String leftText, String rightText, {bool isBold = false}) {
   return Padding(
     padding: const EdgeInsets.symmetric(vertical: 4.0),
     child: Row(
@@ -305,15 +322,11 @@ Widget _buildReceiptRow(String leftText, String rightText,
       children: [
         Text(
           leftText,
-          style: TextStyle(
-              fontSize: 16,
-              fontWeight: isBold ? FontWeight.bold : FontWeight.normal),
+          style: TextStyle(fontSize: 16, fontWeight: isBold ? FontWeight.bold : FontWeight.normal),
         ),
         Text(
           rightText,
-          style: TextStyle(
-              fontSize: 16,
-              fontWeight: isBold ? FontWeight.bold : FontWeight.normal),
+          style: TextStyle(fontSize: 16, fontWeight: isBold ? FontWeight.bold : FontWeight.normal),
         ),
       ],
     ),
