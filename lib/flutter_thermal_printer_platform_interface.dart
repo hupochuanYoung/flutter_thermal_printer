@@ -8,8 +8,8 @@ import 'flutter_thermal_printer_method_channel.dart';
 abstract class FlutterThermalPrinterPlatform extends PlatformInterface {
   FlutterThermalPrinterPlatform() : super(token: _token);
   static final Object _token = Object();
-  static FlutterThermalPrinterPlatform _instance =
-      MethodChannelFlutterThermalPrinter();
+  static FlutterThermalPrinterPlatform _instance = MethodChannelFlutterThermalPrinter();
+
   static FlutterThermalPrinterPlatform get instance => _instance;
 
   static set instance(FlutterThermalPrinterPlatform instance) {
@@ -38,8 +38,7 @@ abstract class FlutterThermalPrinterPlatform extends PlatformInterface {
   }
 
   Future<dynamic> convertImageToGrayscale(Uint8List? value) {
-    throw UnimplementedError(
-        "convertImageToGrayscale() has not been implemented.");
+    throw UnimplementedError("convertImageToGrayscale() has not been implemented.");
   }
 
   Future<bool> disconnect(DeviceModel device) {
@@ -54,7 +53,7 @@ abstract class FlutterThermalPrinterPlatform extends PlatformInterface {
     throw UnimplementedError("getPrinters() has not been implemented.");
   }
 
-  Future<bool> startListening(String vid, String pid) {
+  Future<bool> startListening(String vid, String pid, String deviceId) {
     throw UnimplementedError('startListening() has not been implemented.');
   }
 

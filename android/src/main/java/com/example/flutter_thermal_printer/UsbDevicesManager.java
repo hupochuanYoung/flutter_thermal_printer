@@ -1,6 +1,7 @@
 package com.example.flutter_thermal_printer;
 
 import static android.content.Context.USB_SERVICE;
+
 import com.example.flutter_thermal_printer.utils.AppLogger;
 
 import android.annotation.SuppressLint;
@@ -14,6 +15,7 @@ import android.hardware.usb.UsbDeviceConnection;
 import android.hardware.usb.UsbEndpoint;
 import android.hardware.usb.UsbManager;
 import android.os.Build;
+
 import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -24,7 +26,9 @@ import java.util.Objects;
 import android.content.BroadcastReceiver;
 import android.content.IntentFilter;
 import android.util.Log;
+
 import java.nio.charset.StandardCharsets;
+
 import android.os.Handler;
 import android.os.Looper;
 
@@ -83,6 +87,7 @@ public class UsbDevicesManager {
             }
         };
     }
+
     public EventChannel.StreamHandler getCallerIdStreamHandler() {
         return new EventChannel.StreamHandler() {
             @Override
@@ -110,13 +115,13 @@ public class UsbDevicesManager {
                     UsbDevice device = intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
                     AppLogger.d(TAG, "ACTION_USB_DETACHED");
 
-                    if (listeningDevice != null && device != null && device.getVendorId() == listeningDevice.getVendorId() && device.getProductId() == listeningDevice.getProductId()) {
+                    if (listeningDevice != null && device != null && device.getVendorId() == listeningDevice.getVendorId() && device.getProductId() == listeningDevice.getProductId() && device.getDeviceId() == listeningDevice.getDeviceId()) {
                         stopListening();
                     }
                     sendDevice(device, true);
                 } else if (Objects.equals(intent.getAction(), ACTION_USB_PERMISSION)) {
                     AppLogger.d(TAG, "ACTION_USB_PERMISSION " + (intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false)));
-                   synchronized (this) {
+                    synchronized (this) {
                         UsbDevice device = intent.getParcelableExtra(UsbManager.EXTRA_DEVICE);
                         boolean permissionGranted = intent.getBooleanExtra(UsbManager.EXTRA_PERMISSION_GRANTED, false);
                         if (permissionGranted) {
@@ -124,7 +129,7 @@ public class UsbDevicesManager {
                             sendDevice(device, false);
                         } else {
                             Log.d(TAG, "Permission denied for device " + device);
-                            connect(connectionVendorId, connectionProductId);
+                            connect(connectionVendorId, connectionProductId, connectionDeviceId);
                         }
                     }
                 }
@@ -133,20 +138,33 @@ public class UsbDevicesManager {
     }
 
 
-
-
     private void sendDevice(UsbDevice device, boolean isRemove) {
         if (device == null) {
             AppLogger.d(TAG, "Device is null.");
             return;
         }
-        boolean isConnected = isConnected(String.valueOf(device.getVendorId()), String.valueOf(device.getProductId()));
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                try {
+                    UsbManager m = (UsbManager) context.getSystemService(USB_SERVICE);
+                    if (m.hasPermission(device)) {
+                        AppLogger.d(TAG, device.getDeviceName() + "==getDeviceId" + device.getDeviceId() + "== getManufacturerName" + device.getManufacturerName() + "==getVersion" + device.getVersion() + "== getSerialNumber " + device.getSerialNumber() + "== getDeviceClass" + device.getDeviceClass() + "==getDeviceSubclass " + device.getDeviceSubclass() + "==getDeviceProtocol " + device.getDeviceProtocol() + "==getConfigurationCount " + device.getConfigurationCount() + "==getInterfaceCount " + device.getInterfaceCount());
+                    } else {
+                        AppLogger.d(TAG, device.getDeviceName() + "==getDeviceId" + device.getDeviceId() + "== getDeviceClass" + device.getDeviceClass() + "==getDeviceSubclass " + device.getDeviceSubclass() + "==getDeviceProtocol " + device.getDeviceProtocol() + "==getConfigurationCount " + device.getConfigurationCount() + "==getInterfaceCount " + device.getInterfaceCount() + " (Permission not granted)");
+                    }
+                } catch (SecurityException e) {
+                    AppLogger.e(TAG, "SecurityException when accessing device info: " + e.getMessage());
+                }
+            }
+        }
+        boolean isConnected = isConnected(String.valueOf(device.getVendorId()), String.valueOf(device.getProductId()), String.valueOf(device.getDeviceId()));
         HashMap<String, Object> deviceData = new HashMap<>();
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
             deviceData.put("name", device.getProductName());
         }
         deviceData.put("vendorId", String.valueOf(device.getVendorId()));
         deviceData.put("productId", String.valueOf(device.getProductId()));
+        deviceData.put("deviceId", String.valueOf(device.getDeviceId()));
         deviceData.put("connected", isConnected);
         deviceData.put("isRemove", isRemove);
         AppLogger.d(TAG, "Sending device data: " + deviceData);
@@ -155,8 +173,6 @@ public class UsbDevicesManager {
         }
 
     }
-
-
 
     UsbDevicesManager(Context context) {
         UsbDevicesManager.context = context;
@@ -171,9 +187,10 @@ public class UsbDevicesManager {
             UsbDevice device = entry.getValue();
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
                 HashMap<String, Object> deviceData = new HashMap<String, Object>();
-                deviceData.put("name", device.getProductName());
                 deviceData.put("vendorId", String.valueOf(device.getVendorId()));
+                deviceData.put("name", device.getProductName());
                 deviceData.put("productId", String.valueOf(device.getProductId()));
+                deviceData.put("deviceId", String.valueOf(device.getDeviceId()));
                 deviceData.put("connected", m.hasPermission(device));
                 data.add(deviceData);
             }
@@ -183,13 +200,14 @@ public class UsbDevicesManager {
 
     private String connectionVendorId;
     private String connectionProductId;
+    private String connectionDeviceId;
 
-
-    public void connect(String vendorId, String productId) {
+    public void connect(String vendorId, String productId, String deviceId) {
         connectionVendorId = vendorId;
         connectionProductId = productId;
+        connectionDeviceId = deviceId;
         UsbManager m = (UsbManager) context.getSystemService(Context.USB_SERVICE);
-        UsbDevice device = findDevice(m, vendorId, productId);
+        UsbDevice device = findDevice(m, vendorId, productId, deviceId);
 
         if (device == null) {
             AppLogger.d(TAG, "when connect but Device not found.");
@@ -207,16 +225,9 @@ public class UsbDevicesManager {
     }
 
     //    Print text on the printer
-    public void printText(String vendorId, String productId, List<Integer> bytes) {
+    public void printText(String vendorId, String productId, String deviceId, List<Integer> bytes) {
         UsbManager m = (UsbManager) context.getSystemService(USB_SERVICE);
-        HashMap<String, UsbDevice> usbDevices = m.getDeviceList();
-        UsbDevice device = null;
-        for (Map.Entry<String, UsbDevice> entry : usbDevices.entrySet()) {
-            if (String.valueOf(entry.getValue().getVendorId()).equals(vendorId) && String.valueOf(entry.getValue().getProductId()).equals(productId)) {
-                device = entry.getValue();
-                break;
-            }
-        }
+        UsbDevice device = findDevice(m, vendorId, productId, deviceId);
         if (device == null) {
             return;
         }
@@ -248,13 +259,13 @@ public class UsbDevicesManager {
         connection.close();
     }
 
-    public boolean isConnected(String vendorId, String productId) {
-        UsbDevice device = findDevice((UsbManager) context.getSystemService(USB_SERVICE), vendorId, productId);
+    public boolean isConnected(String vendorId, String productId, String deviceId) {
+        UsbDevice device = findDevice((UsbManager) context.getSystemService(USB_SERVICE), vendorId, productId, deviceId);
         return device != null && ((UsbManager) context.getSystemService(USB_SERVICE)).hasPermission(device);
     }
 
-    public boolean disconnect(String vendorId, String productId) {
-        UsbDevice device = findDevice((UsbManager) context.getSystemService(USB_SERVICE), vendorId, productId);
+    public boolean disconnect(String vendorId, String productId, String deviceId) {
+        UsbDevice device = findDevice((UsbManager) context.getSystemService(USB_SERVICE), vendorId, productId, deviceId);
         if (device == null || !((UsbManager) context.getSystemService(USB_SERVICE)).hasPermission(device))
             return false;
 
@@ -265,14 +276,13 @@ public class UsbDevicesManager {
         return true;
     }
 
-    private UsbDevice findDevice(UsbManager manager, String vendorId, String productId) {
+    private UsbDevice findDevice(UsbManager manager, String vendorId, String productId, String deviceId) {
         for (UsbDevice device : manager.getDeviceList().values()) {
-            if (String.valueOf(device.getVendorId()).equals(vendorId) && String.valueOf(device.getProductId()).equals(productId))
+            if (String.valueOf(device.getVendorId()).equals(vendorId) && String.valueOf(device.getProductId()).equals(productId) && String.valueOf(device.getDeviceId()).equals(deviceId))
                 return device;
         }
         return null;
     }
-
 
 
     public String getDeviceType(UsbInterface intf) {
@@ -292,13 +302,13 @@ public class UsbDevicesManager {
 
     UsbDevice listeningDevice = null;
 
-    public void startListening(String vendorId, String productId) {
+    public void startListening(String vendorId, String productId, String deviceId) {
         AppLogger.d(TAG, "Attempting to connect to device...");
 
         UsbManager m = (UsbManager) context.getSystemService(Context.USB_SERVICE);
         UsbDevice currentDevice = null;
         for (UsbDevice device : m.getDeviceList().values()) {
-            if (String.valueOf(device.getVendorId()).equals(vendorId) && String.valueOf(device.getProductId()).equals(productId)) {
+            if (String.valueOf(device.getVendorId()).equals(vendorId) && String.valueOf(device.getProductId()).equals(productId) && String.valueOf(device.getDeviceId()).equals(deviceId)) {
                 currentDevice = device;
                 break;
             }
@@ -377,7 +387,7 @@ public class UsbDevicesManager {
             final String strPackage = composeString(bytes);
             AppLogger.d("analyzePackage", strPackage);
 
-            if (strPackage.contains("ENQ") ||strPackage.contains("ETB")){
+            if (strPackage.contains("ENQ") || strPackage.contains("ETB")) {
                 sendData(ACK);
             }
 //            else if (strPackage.contains("STA")) echoLineEvent(strPackage);

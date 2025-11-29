@@ -77,6 +77,7 @@ class OtherPrinterManager {
     return FlutterThermalPrinterPlatform.instance.startListening(
       device.vendorId!,
       device.productId!,
+      device.deviceId!,
     );
   }
 
@@ -369,12 +370,15 @@ class OtherPrinterManager {
 
       List<DeviceModel> usbPrinters = [];
       for (var map in devices) {
+        final deviceId = map['deviceId'].toString();
         final printer = DeviceModel(
           vendorId: map['vendorId'].toString(),
           productId: map['productId'].toString(),
+          deviceId: deviceId,
           name: map['name'],
           connectionType: ConnectionType.USB,
-          address: map['vendorId'].toString(),
+          address: deviceId,
+          // Use deviceId as unique address for USB devices
           isConnected: map['connected'] ?? false,
           isRemove: map['isRemove'] ?? false,
         );
@@ -386,15 +390,19 @@ class OtherPrinterManager {
       _usbSubscription?.cancel();
       _usbSubscription = _deviceEventChannel.receiveBroadcastStream().listen((event) {
         final map = Map<String, dynamic>.from(event);
-        _updateOrAddPrinter(DeviceModel(
+        final deviceId = map['deviceId'].toString();
+        DeviceModel deviceModel=  DeviceModel(
           vendorId: map['vendorId'].toString(),
           productId: map['productId'].toString(),
+          deviceId: deviceId,
           name: map['name'],
           connectionType: ConnectionType.USB,
-          address: map['vendorId'].toString(),
+          address: deviceId,
+          // Use deviceId as unique address for USB devices
           isConnected: map['connected'] ?? false,
           isRemove: map['isRemove'] ?? false,
-        ));
+        );
+        _updateOrAddPrinter(deviceModel);
       });
 
       _sortDevices();

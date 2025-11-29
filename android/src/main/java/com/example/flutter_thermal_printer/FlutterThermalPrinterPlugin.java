@@ -53,34 +53,39 @@ public class FlutterThermalPrinterPlugin implements FlutterPlugin, MethodCallHan
             case "connect": {
                 String vendorId = call.argument("vendorId");
                 String productId = call.argument("productId");
-                usbDevicesManager.connect(vendorId, productId);
+                String deviceId = call.argument("deviceId");
+                usbDevicesManager.connect(vendorId, productId, deviceId);
                 result.success(false);
                 break;
             }
             case "disconnect": {
                 String vendorId = call.argument("vendorId");
                 String productId = call.argument("productId");
-                result.success(usbDevicesManager.disconnect(vendorId, productId));
+                String deviceId = call.argument("deviceId");
+                result.success(usbDevicesManager.disconnect(vendorId, productId, deviceId));
                 break;
             }
             case "printText": {
                 String vendorId = call.argument("vendorId");
                 String productId = call.argument("productId");
+                String deviceId = call.argument("deviceId");
                 List<Integer> data = call.argument("data");
-                usbDevicesManager.printText(vendorId, productId, data);
+                usbDevicesManager.printText(vendorId, productId, deviceId, data);
                 result.success(true);
                 break;
             }
             case "isConnected": {
                 String vendorId = call.argument("vendorId");
                 String productId = call.argument("productId");
-                result.success(usbDevicesManager.isConnected(vendorId, productId));
+                String deviceId = call.argument("deviceId");
+                result.success(usbDevicesManager.isConnected(vendorId, productId, deviceId));
                 break;
             }
             case "startListening": {
                 String vendorId = call.argument("vendorId");
                 String productId = call.argument("productId");
-                usbDevicesManager.startListening(vendorId, productId);
+                String deviceId = call.argument("deviceId");
+                usbDevicesManager.startListening(vendorId, productId, deviceId);
                 result.success(true);
                 break;
             }

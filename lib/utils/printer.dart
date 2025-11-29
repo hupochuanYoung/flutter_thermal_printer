@@ -19,6 +19,7 @@ class DeviceModel {
   bool? isConnected;
   String? vendorId;
   String? productId;
+  String? deviceId;
   int? rssi;
   bool? isRemove;
   String? bleDeviceType;
@@ -30,6 +31,7 @@ class DeviceModel {
     this.isConnected,
     this.vendorId,
     this.productId,
+    this.deviceId,
     this.rssi,
     this.isRemove,
     this.bleDeviceType,
@@ -37,12 +39,12 @@ class DeviceModel {
 
   DeviceModel.fromJson(Map<String, dynamic> json) {
     address = json['address'];
-    name =
-        json['connectionType'] == 'BLE' ? json['platformName'] : json['name'];
+    name = json['connectionType'] == 'BLE' ? json['platformName'] : json['name'];
     connectionType = _getConnectionTypeFromString(json['connectionType']);
     isConnected = json['isConnected'];
     vendorId = json['vendorId'];
     productId = json['productId'];
+    deviceId = json['deviceId'];
     rssi = json['rssi'];
     isRemove = json['isRemove'];
     bleDeviceType = json['bleDeviceType'];
@@ -61,6 +63,7 @@ class DeviceModel {
     data['vendorId'] = vendorId;
     data['rssi'] = rssi;
     data['productId'] = productId;
+    data['deviceId'] = deviceId;
     data['isRemove'] = isRemove;
     data['bleDeviceType'] = bleDeviceType;
     return data;

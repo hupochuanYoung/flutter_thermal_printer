@@ -12,8 +12,7 @@ class MethodChannelFlutterThermalPrinter extends FlutterThermalPrinterPlatform {
 
   @override
   Future<String?> getPlatformVersion() async {
-    final version =
-        await methodChannel.invokeMethod<String>('getPlatformVersion');
+    final version = await methodChannel.invokeMethod<String>('getPlatformVersion');
     return version;
   }
 
@@ -27,15 +26,16 @@ class MethodChannelFlutterThermalPrinter extends FlutterThermalPrinterPlatform {
     return await methodChannel.invokeMethod('connect', {
       "vendorId": device.vendorId.toString(),
       "productId": device.productId.toString(),
+      "deviceId": device.deviceId.toString(),
     });
   }
 
   @override
-  Future<bool> printText(DeviceModel device, Uint8List data,
-      {String? path}) async {
+  Future<bool> printText(DeviceModel device, Uint8List data, {String? path}) async {
     return await methodChannel.invokeMethod('printText', {
       "vendorId": device.vendorId.toString(),
       "productId": device.productId.toString(),
+      "deviceId": device.deviceId.toString(),
       "data": List<int>.from(data),
       "path": path ?? "",
     });
@@ -46,6 +46,7 @@ class MethodChannelFlutterThermalPrinter extends FlutterThermalPrinterPlatform {
     return await methodChannel.invokeMethod('isConnected', {
       "vendorId": device.vendorId.toString(),
       "productId": device.productId.toString(),
+      "deviceId": device.deviceId.toString(),
     });
   }
 
@@ -61,14 +62,16 @@ class MethodChannelFlutterThermalPrinter extends FlutterThermalPrinterPlatform {
     return await methodChannel.invokeMethod('disconnect', {
       "vendorId": device.vendorId.toString(),
       "productId": device.productId.toString(),
+      "deviceId": device.deviceId.toString(),
     });
   }
 
   @override
-  Future<bool> startListening(String vid, String pid) async {
+  Future<bool> startListening(String vid, String pid, String deviceId) async {
     return await methodChannel.invokeMethod('startListening', {
       "vendorId": vid,
       "productId": pid,
+      "deviceId": deviceId,
     });
   }
 
