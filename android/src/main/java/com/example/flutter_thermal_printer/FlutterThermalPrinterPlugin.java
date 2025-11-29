@@ -15,69 +15,95 @@ import io.flutter.plugin.common.EventChannel;
 
 /** FlutterThermalPrinterPlugin */
 public class FlutterThermalPrinterPlugin implements FlutterPlugin, MethodCallHandler {
-  /// The MethodChannel that will the communication between Flutter and native Android
-  ///
-  /// This local reference serves to register the plugin with the Flutter Engine and unregister it
-  /// when the Flutter Engine is detached from the Activity
-  private MethodChannel channel;
-  private EventChannel eventChannel;
-  private Context context;
-  private UsbPrinter usbPrinter;
+    /// The MethodChannel that will the communication between Flutter and native
+    /// Android
+    ///
+    /// This local reference serves to register the plugin with the Flutter Engine
+    /// and unregister it
+    /// when the Flutter Engine is detached from the Activity
+    private MethodChannel channel;
+    private EventChannel deviceEventChannel;
+    private EventChannel callerIdEventChannel;
+    private Context context;
+    private UsbDevicesManager usbDevicesManager;
 
-  @Override
-  public void onAttachedToEngine(@NonNull FlutterPluginBinding flutterPluginBinding) {
-    channel = new MethodChannel(flutterPluginBinding.getBinaryMessenger(), "flutter_thermal_printer");
-    eventChannel = new EventChannel(flutterPluginBinding.getBinaryMessenger(), "flutter_thermal_printer/events");
-    channel.setMethodCallHandler(this);
-    context = flutterPluginBinding.getApplicationContext();
-    usbPrinter = new UsbPrinter(context); 
-    eventChannel.setStreamHandler(usbPrinter);
-  }
+    @Override
+    public void onAttachedToEngine(@NonNull FlutterPluginBinding flutterPluginBinding) {
+        channel = new MethodChannel(flutterPluginBinding.getBinaryMessenger(), "flutter_thermal_printer");
+        deviceEventChannel = new EventChannel(flutterPluginBinding.getBinaryMessenger(), "flutter_thermal_printer/device_events");
+        callerIdEventChannel = new EventChannel(flutterPluginBinding.getBinaryMessenger(), "flutter_thermal_printer/callerid_events");
 
-  @Override
-  public void onMethodCall(@NonNull MethodCall call, @NonNull Result result) {
-      switch (call.method) {
-          case "getPlatformVersion":
-              result.success("Android " + android.os.Build.VERSION.RELEASE);
-              break;
-          case "getUsbDevicesList":
-              result.success(usbPrinter.getUsbDevicesList());
-              break;
-          case "connect": {
-              String vendorId = call.argument("vendorId");
-              String productId = call.argument("productId");
-              usbPrinter.connect(vendorId, productId);
-              result.success(false  );
-              break;
-          }
-          case "disconnect": {
-              String vendorId = call.argument("vendorId");
-              String productId = call.argument("productId");
-              result.success(usbPrinter.disconnect(vendorId, productId));
-              break;
-          }
-          case "printText": {
-              String vendorId = call.argument("vendorId");
-              String productId = call.argument("productId");
-              List<Integer> data = call.argument("data");
-              usbPrinter.printText(vendorId, productId, data);
-              result.success(true);
-              break;
-          }
-          case "isConnected": {
-              String vendorId = call.argument("vendorId");
-              String productId = call.argument("productId");
-              result.success(usbPrinter.isConnected(vendorId, productId));
-              break;
-          }
-          default:
-              result.notImplemented();
-              break;
-      }
-  }
+        channel.setMethodCallHandler(this);
+        context = flutterPluginBinding.getApplicationContext();
+        usbDevicesManager = new UsbDevicesManager(context);
+        deviceEventChannel.setStreamHandler(usbDevicesManager.getDeviceStreamHandler());
+        callerIdEventChannel.setStreamHandler(usbDevicesManager.getCallerIdStreamHandler());
 
-  @Override
-  public void onDetachedFromEngine(@NonNull FlutterPluginBinding binding) {
-    channel.setMethodCallHandler(null);
-  }
+    }
+
+    @Override
+    public void onMethodCall(@NonNull MethodCall call, @NonNull Result result) {
+        switch (call.method) {
+            case "getPlatformVersion":
+                result.success("Android " + android.os.Build.VERSION.RELEASE);
+                break;
+            case "getUsbDevicesList":
+                result.success(usbDevicesManager.getUsbDevicesList());
+                break;
+            case "connect": {
+                String vendorId = call.argument("vendorId");
+                String productId = call.argument("productId");
+                String deviceId = call.argument("deviceId");
+                usbDevicesManager.connect(vendorId, productId, deviceId);
+                result.success(false);
+                break;
+            }
+            case "disconnect": {
+                String vendorId = call.argument("vendorId");
+                String productId = call.argument("productId");
+                String deviceId = call.argument("deviceId");
+                result.success(usbDevicesManager.disconnect(vendorId, productId, deviceId));
+                break;
+            }
+            case "printText": {
+                String vendorId = call.argument("vendorId");
+                String productId = call.argument("productId");
+                String deviceId = call.argument("deviceId");
+                List<Integer> data = call.argument("data");
+                usbDevicesManager.printText(vendorId, productId, deviceId, data);
+                result.success(true);
+                break;
+            }
+            case "isConnected": {
+                String vendorId = call.argument("vendorId");
+                String productId = call.argument("productId");
+                String deviceId = call.argument("deviceId");
+                result.success(usbDevicesManager.isConnected(vendorId, productId, deviceId));
+                break;
+            }
+            case "startListening": {
+                String vendorId = call.argument("vendorId");
+                String productId = call.argument("productId");
+                String deviceId = call.argument("deviceId");
+                usbDevicesManager.startListening(vendorId, productId, deviceId);
+                result.success(true);
+                break;
+            }
+            case "stopListening": {
+                usbDevicesManager.stopListening();
+                result.success(true);
+                break;
+            }
+            default:
+                result.notImplemented();
+                break;
+        }
+    }
+
+    @Override
+    public void onDetachedFromEngine(@NonNull FlutterPluginBinding binding) {
+        channel.setMethodCallHandler(null);
+        deviceEventChannel.setStreamHandler(null);
+        callerIdEventChannel.setStreamHandler(null);
+    }
 }

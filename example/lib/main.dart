@@ -25,19 +25,20 @@ class _MyAppState extends State<MyApp> {
   String _ip = '192.168.0.100';
   String _port = '9100';
 
-  List<Printer> printers = [];
+  List<DeviceModel> printers = [];
 
-  StreamSubscription<List<Printer>>? _devicesStreamSubscription;
+  StreamSubscription<List<DeviceModel>>? _devicesStreamSubscription;
+  DeviceModel? currentDevice;
 
   // Get Printer List
   void startScan() async {
     _devicesStreamSubscription?.cancel();
-    await _flutterThermalPrinterPlugin.getPrinters(connectionTypes: [
+    await _flutterThermalPrinterPlugin.getDevices(connectionTypes: [
       ConnectionType.USB,
-      ConnectionType.BLE,
     ]);
-    _devicesStreamSubscription = _flutterThermalPrinterPlugin.devicesStream.listen((List<Printer> event) {
+    _devicesStreamSubscription = _flutterThermalPrinterPlugin.devicesStream.listen((List<DeviceModel> event) {
       log(event.map((e) => e.name).toList().toString());
+      event = event.where((element) => element.isRemove == null || element.isRemove == false).toList();
       setState(() {
         printers = event;
         printers.removeWhere((element) => element.name == null || element.name == '');
@@ -163,10 +164,45 @@ class _MyAppState extends State<MyApp> {
                   Expanded(
                     child: ElevatedButton(
                       onPressed: () {
-                        // startScan();
                         stopScan();
                       },
                       child: const Text('Stop Scan'),
+                    ),
+                  ),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () async {
+                        await _flutterThermalPrinterPlugin.printWidget(
+                          context,
+                          printer: printers[1],
+                          widget: receiptWidget(printers[1].connectionTypeString),
+                        );
+                      },
+                      child: const Text('Print receipt'),
+                    ),
+                  ),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        if (currentDevice != null && (currentDevice!.name ?? "").toLowerCase().contains("caller")) {
+                          _flutterThermalPrinterPlugin.startListening(currentDevice!);
+                        }
+                      },
+                      child: currentDevice == null
+                          ? const Text('Start listening')
+                          : Text('${currentDevice?.name} Start listening'),
+                    ),
+                  ),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        if (currentDevice != null && (currentDevice!.name ?? "").toLowerCase().contains("caller")) {
+                          _flutterThermalPrinterPlugin.stopListening();
+                        }
+                      },
+                      child: currentDevice == null
+                          ? const Text('Stop listening')
+                          : Text('${currentDevice?.name} Stop listening'),
                     ),
                   ),
                 ],
@@ -179,24 +215,38 @@ class _MyAppState extends State<MyApp> {
                     return ListTile(
                       onTap: () async {
                         if (printers[index].isConnected ?? false) {
-                          await _flutterThermalPrinterPlugin.disconnect(printers[index]);
+                          bool res = await _flutterThermalPrinterPlugin.disconnect(printers[index]);
+                          if (res) {
+                            setState(() {
+                              printers[index].isConnected = false;
+                            });
+                          }
                         } else {
-                          await _flutterThermalPrinterPlugin.connect(printers[index]);
+                          bool res = await _flutterThermalPrinterPlugin.connect(printers[index]);
+                          setState(() {
+                            printers[index].isConnected = res;
+                          });
                         }
+                        currentDevice = printers[index];
                       },
-                      title: Text(printers[index].name ?? 'No Name'),
-                      subtitle: Text("Connected: ${printers[index].isConnected}"),
+                      title: Text("${printers[index].name}--${printers[index].deviceId}"),
+                      subtitle: Text("Connected: ${printers[index].isConnected} -- ${printers[index].connectionType}"),
                       trailing: IconButton(
-                        icon: const Icon(Icons.connect_without_contact),
+                        icon: const Icon(Icons.print),
                         onPressed: () async {
                           await _flutterThermalPrinterPlugin.printWidget(
                             context,
                             printer: printers[index],
-                            printOnBle: true,
-                            widget: receiptWidget(
-                              printers[index].connectionTypeString,
-                            ),
+                            widget: receiptWidget(printers[index].connectionTypeString),
                           );
+                          // await _flutterThermalPrinterPlugin.printWidget(
+                          //   context,
+                          //   printer: printers[index],
+                          //   printOnBle: true,
+                          //   widget: receiptWidget(
+                          //     printers[index].connectionTypeString,
+                          //   ),
+                          // );
                         },
                       ),
                     );
