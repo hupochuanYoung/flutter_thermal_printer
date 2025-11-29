@@ -38,6 +38,7 @@ class _MyAppState extends State<MyApp> {
     ]);
     _devicesStreamSubscription = _flutterThermalPrinterPlugin.devicesStream.listen((List<DeviceModel> event) {
       log(event.map((e) => e.name).toList().toString());
+      event = event.where((element) => element.isRemove == null || element.isRemove == false).toList();
       setState(() {
         printers = event;
         printers.removeWhere((element) => element.name == null || element.name == '');
@@ -228,19 +229,24 @@ class _MyAppState extends State<MyApp> {
                         }
                         currentDevice = printers[index];
                       },
-                      title: Text(printers[index].name ?? 'No Name'),
+                      title: Text("${printers[index].name}--${printers[index].deviceId}"),
                       subtitle: Text("Connected: ${printers[index].isConnected} -- ${printers[index].connectionType}"),
                       trailing: IconButton(
-                        icon: const Icon(Icons.connect_without_contact),
+                        icon: const Icon(Icons.print),
                         onPressed: () async {
                           await _flutterThermalPrinterPlugin.printWidget(
                             context,
                             printer: printers[index],
-                            printOnBle: true,
-                            widget: receiptWidget(
-                              printers[index].connectionTypeString,
-                            ),
+                            widget: receiptWidget(printers[index].connectionTypeString),
                           );
+                          // await _flutterThermalPrinterPlugin.printWidget(
+                          //   context,
+                          //   printer: printers[index],
+                          //   printOnBle: true,
+                          //   widget: receiptWidget(
+                          //     printers[index].connectionTypeString,
+                          //   ),
+                          // );
                         },
                       ),
                     );
